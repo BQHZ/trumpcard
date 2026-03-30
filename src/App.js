@@ -763,14 +763,17 @@ export default function App(){
 
   /* ── CREATE / JOIN ── */
   if(screen==="create")return(
-    <CreateRoomScreen
-      settings={settings}
-      onBack={()=>setScreen("home")}
-      roomCodeRef={roomCodeRef}
-      setRoomCode={setRoomCode}
-      setMyPid={setMyPid}
-    />
-  );
+  <CreateRoomScreen
+    settings={settings}
+    onBack={()=>setScreen("home")}
+    roomCodeRef={roomCodeRef}
+    setRoomCode={setRoomCode}
+    setMyPid={setMyPid}
+    setGs={setGs}
+    setScreen={setScreen}
+    setTimerKey={setTimerKey}
+  />
+);
 
   if(screen==="join")return(
     <JoinRoomScreen
