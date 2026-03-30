@@ -476,14 +476,15 @@ const CreateRoomScreen=({settings,onBack,roomCodeRef,setRoomCode,setMyPid,setGs}
   // eslint-disable-next-line
   },[status]);
 
-  // Step 3: when joinedState is set, update gs/roomCode/pid — App will auto-navigate
+  // Step 3: when joinedState is set, navigate — separate from polling to avoid stale closures
   useEffect(()=>{
     if(!joinedState)return;
     roomCodeRef.current=code;
     setRoomCode(code);
     setMyPid(0);
     setGs(joinedState);
-    // setScreen is handled by App watching gs, not here
+    setScreen("game");
+    setTimerKey(k=>k+1);
   // eslint-disable-next-line
   },[joinedState]);
 
@@ -572,6 +573,15 @@ export default function App(){
   const revTimers=useRef([]);
   const roomCodeRef=useRef(null); // eslint-disable-line
   const lastPushed=useRef(null);
+
+   useEffect(()=>{
+    if(!gs)return;
+    // Host: when p2 joins, gs gets set — navigate to game
+    if(gs.p2joined===true&&screen==="create"){
+      setScreen("game");
+      setTimerKey(k=>k+1);
+    }
+  },[gs]);
 
   /* ── BOT TURN ── */
   useEffect(()=>{
@@ -788,14 +798,15 @@ export default function App(){
 
   /* ── CREATE / JOIN ── */
   if(screen==="create")return(
-    <CreateRoomScreen
-      settings={settings}
-      onBack={()=>setScreen("home")}
-      roomCodeRef={roomCodeRef}
-      setRoomCode={setRoomCode}
-      setMyPid={setMyPid}
-    />
-  );
+  <CreateRoomScreen
+    settings={settings}
+    onBack={()=>setScreen("home")}
+    roomCodeRef={roomCodeRef}
+    setRoomCode={setRoomCode}
+    setMyPid={setMyPid}
+    setGs={setGs}
+  />
+);
 
   if(screen==="join")return(
     <JoinRoomScreen
