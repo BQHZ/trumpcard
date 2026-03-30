@@ -321,18 +321,31 @@ const CreateRoomScreen=({settings,onBack,roomCodeRef,mkRound,setGs,setScreen})=>
     <div style={{display:"flex",gap:12}}>
       <Btn3D label="← Back" onClick={onBack} top="#3a3020" bot="#1a1810" shad="#0a0804"/>
       <Btn3D label="Start (Same Device)" onClick={async () => {
+  try {
+    alert("Step 1: Creating room with code: " + code);
+    
     const initialState = mkRound([0,0], 1, "pvp", settings, null);
-    const { error } = await supabase
-    .from('rooms')
-    .insert({ code, state: initialState });
+    alert("Step 2: Game state created OK");
+
+    const { data, error } = await supabase
+      .from('rooms')
+      .insert({ code, state: initialState })
+      .select();
+
+    alert("Step 3: Supabase response - error: " + JSON.stringify(error) + " data: " + JSON.stringify(data));
+
     if (error) {
-    alert('Failed to create room: ' + error.message);
-    return;
+      alert("INSERT FAILED: " + error.message + " | Code: " + error.code);
+      return;
     }
+
     roomCodeRef.current = code;
     setGs(initialState);
     setScreen('game');
-    }}/>
+  } catch(e) {
+    alert("EXCEPTION: " + e.message);
+  }
+}}/>
     </div>
     <div style={{fontSize:10,color:"#2a2015",textAlign:"center"}}>Settings: {settings.maxRounds} rounds · {settings.timerSec}s timer</div>
   </div>);
