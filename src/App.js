@@ -295,7 +295,7 @@ const SettingsModal=({settings,onChange,onClose})=>{
 };
 
 /* ─── CREATE ROOM SCREEN ─────────────────────────────────────────────── */
-const CreateRoomScreen=({settings,onBack,gs,roomCodeRef})=>{
+const CreateRoomScreen=({settings,onBack,roomCodeRef,mkRound,setGs,setScreen})=>{
   const code=useRef(genCode()).current;
   const[copied,setCopied]=useState(false);
   const copy=()=>{navigator.clipboard?.writeText(code).catch(()=>{});setCopied(true);setTimeout(()=>setCopied(false),2000);};
@@ -320,7 +320,19 @@ const CreateRoomScreen=({settings,onBack,gs,roomCodeRef})=>{
     </div>
     <div style={{display:"flex",gap:12}}>
       <Btn3D label="← Back" onClick={onBack} top="#3a3020" bot="#1a1810" shad="#0a0804"/>
-      <Btn3D label="Start (Same Device)" onClick={async () => {await supabase.from('rooms').insert({ code, state: gs });roomCodeRef.current = code;}}/>
+      <Btn3D label="Start (Same Device)" onClick={async () => {
+    const initialState = mkRound([0,0], 1, "pvp", settings, null);
+    const { error } = await supabase
+    .from('rooms')
+    .insert({ code, state: initialState });
+    if (error) {
+    alert('Failed to create room: ' + error.message);
+    return;
+    }
+    roomCodeRef.current = code;
+    setGs(initialState);
+    setScreen('game');
+    }}/>
     </div>
     <div style={{fontSize:10,color:"#2a2015",textAlign:"center"}}>Settings: {settings.maxRounds} rounds · {settings.timerSec}s timer</div>
   </div>);
@@ -531,7 +543,14 @@ useEffect(() => {
     </div>);
   }
 
-  if(screen==="create")return<CreateRoomScreen settings={settings} onBack={()=>setScreen("home")} gs={gs} roomCodeRef={roomCodeRef}/>;
+  if(screen==="create")return<CreateRoomScreen 
+  settings={settings}
+  onBack={()=>setScreen("home")}
+  roomCodeRef={roomCodeRef}
+  mkRound={mkRound}
+  setGs={setGs}
+  setScreen={setScreen}
+  />;
   if(screen==="join")return<JoinRoomScreen
   onBack={()=>setScreen("home")}
   onJoin={async (code) => {
