@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "./supabase";
 
-/* ─── TRUMP DEFS ─────────────────────────────────────────────────────── */
-const TD={
+/* ─── TRUMP DEFINITIONS ──────────────────────────────────────────────── */
+const TD = {
   card2:{n:"2 Card",sym:"Ⅱ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 2 from the deck. If unavailable, nothing happens."},
   card3:{n:"3 Card",sym:"Ⅲ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 3. If unavailable, nothing happens."},
   card4:{n:"4 Card",sym:"Ⅳ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 4. If unavailable, nothing happens."},
@@ -15,11 +15,11 @@ const TD={
   switch:{n:"Switch",sym:"⟲",color:"#bf360c",glow:"#ff5722",d:"Discard 2 trump cards at random, draw 3 new ones."},
   switchp:{n:"Switch+",sym:"⟳",color:"#870000",glow:"#e53935",d:"Discard 1 trump card at random, draw 4 new ones."},
   shield:{n:"Shield",sym:"◬",color:"#37474f",glow:"#90a4ae",d:"Place Shield on the table. (No active effect in current rules.)"},
-  shieldp:{n:"Shield+",sym:"◭",color:"#263238",glow:"#607d8b",d:"Stronger version of Shield. (No active effect.)"},
+  shieldp:{n:"Shield+",sym:"◭",color:"#263238",glow:"#607d8b",d:"Stronger Shield. (No active effect in current rules.)"},
   destroy:{n:"Destroy",sym:"✦",color:"#880e4f",glow:"#e91e63",d:"Destroy the last trump card your opponent placed on the table."},
   destroyp:{n:"Destroy+",sym:"✧",color:"#560027",glow:"#c2185b",d:"Destroy ALL trump cards your opponent has on the table."},
-  destroypp:{n:"Destroy++",sym:"☩",color:"#1a0033",glow:"#7b1fa2",d:"Clear all opponent table trumps AND block their trump use while this card stays on the table."},
-  pdraw:{n:"Perf. Draw",sym:"⊛",color:"#7a5800",glow:"#ffc107",d:"Draw the best possible card — closest to target without busting."},
+  destroypp:{n:"Destroy++",sym:"☩",color:"#1a0033",glow:"#7b1fa2",d:"Clear all opponent table trumps AND block their trump use while this stays on the table."},
+  pdraw:{n:"Perf. Draw",sym:"⊛",color:"#7a5800",glow:"#ffc107",d:"Draw the single best possible card from the deck."},
   pdrawp:{n:"Perf.Draw+",sym:"⊕",color:"#5a4000",glow:"#ffb300",d:"Draw the best possible card from the deck."},
   udraw:{n:"Ult. Draw",sym:"⊗",color:"#4a3000",glow:"#ff8f00",d:"Draw the best possible card, then draw 2 additional trump cards."},
   go17:{n:"Go for 17",sym:"⑰",color:"#3e2723",glow:"#8d6e63",d:"Change the round target to 17. Replaces any existing Go For card."},
@@ -27,52 +27,53 @@ const TD={
   go27:{n:"Go for 27",sym:"㉗",color:"#1a237e",glow:"#5c6bc0",d:"Change the round target to 27. Replaces any existing Go For card."},
   harvest:{n:"Harvest",sym:"✿",color:"#33691e",glow:"#8bc34a",d:"Place Harvest on table. Draw 1 bonus trump after each trump you play."},
 };
-const TK=Object.keys(TD);
-const TIER=[
+const TK = Object.keys(TD);
+const TIER = [
   {bg:"#030e1f",acc:"#0a2248",clr:"#90caf9",gw:"#1565c0",lbl:"ICE"},
   {bg:"#021408",acc:"#083020",clr:"#80cbc4",gw:"#00695c",lbl:"JADE"},
   {bg:"#1c0f00",acc:"#402000",clr:"#ffe082",gw:"#f9a825",lbl:"GOLD"},
   {bg:"#180000",acc:"#3e0808",clr:"#ef9a9a",gw:"#c62828",lbl:"RUBY"},
 ];
-const cTier=v=>v<=3?0:v<=6?1:v<=9?2:3;
+const cTier = v => v<=3?0:v<=6?1:v<=9?2:3;
 
 /* ─── UTILS ──────────────────────────────────────────────────────────── */
-const shuf=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]];}return b;};
-const rT=n=>Array.from({length:n},()=>TK[0|Math.random()*TK.length]);
-const hSum=h=>h.reduce((s,c)=>s+c.v,0);
-const getTgt=ps=>{for(const p of ps)for(const t of p.tbl){if(t==="go17")return 17;if(t==="go24")return 24;if(t==="go27")return 27;}return 21;};
-const lastFU=h=>{for(let i=h.length-1;i>=0;i--)if(!h[i].fd)return i;return -1;};
-const bestCard=(h,deck,T)=>{const s=hSum(h),ok=deck.filter(v=>s+v<=T);return ok.length?ok.reduce((b,v)=>(T-s-v)<(T-s-b)?v:b):deck.length?Math.min(...deck):null;};
-const genCode=()=>Math.random().toString(36).substring(2,8).toUpperCase();
-const winThreshold=maxR=>Math.floor(maxR/2)+1;
+const shuf = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=0|Math.random()*(i+1);[b[i],b[j]]=[b[j],b[i]];} return b; };
+const rT   = n => Array.from({length:n},()=>TK[0|Math.random()*TK.length]);
+const hSum = h => h.reduce((s,c)=>s+c.v,0);
+const getTgt = ps => { for(const p of ps) for(const t of p.tbl){if(t==="go17")return 17;if(t==="go24")return 24;if(t==="go27")return 27;} return 21; };
+const lastFU = h => { for(let i=h.length-1;i>=0;i--) if(!h[i].fd) return i; return -1; };
+const bestCard = (h,deck,T) => { const s=hSum(h),ok=deck.filter(v=>s+v<=T); return ok.length?ok.reduce((b,v)=>(T-s-v)<(T-s-b)?v:b):deck.length?Math.min(...deck):null; };
+const genCode = () => Math.random().toString(36).substring(2,8).toUpperCase();
+const winThreshold = maxR => Math.floor(maxR/2)+1;
 
 /* ─── GAME LOGIC ─────────────────────────────────────────────────────── */
-const mkRound=(sc,rnd,mode,settings,prevTr)=>{
-  const d=shuf([1,2,3,4,5,6,7,8,9,10,11]);
-  return{
-    deck:d.slice(4),
-    p:[
-      {h:[{v:d[0],fd:false},{v:d[1],fd:false}],tr:[...(prevTr?.[0]||[]),...rT(2)],tbl:[],played:[],std:false,blk:false},
-      {h:[{v:d[2],fd:true},{v:d[3],fd:false}],tr:[...(prevTr?.[1]||[]),...rT(2)],tbl:[],played:[],std:false,blk:false},
+const mkRound = (sc,rnd,mode,settings,prevTr) => {
+  const d = shuf([1,2,3,4,5,6,7,8,9,10,11]);
+  return {
+    deck: d.slice(4),
+    p: [
+      {h:[{v:d[0],fd:false},{v:d[1],fd:false}], tr:[...(prevTr?.[0]||[]),...rT(2)], tbl:[], played:[], std:false, blk:false},
+      {h:[{v:d[2],fd:true}, {v:d[3],fd:false}], tr:[...(prevTr?.[1]||[]),...rT(2)], tbl:[], played:[], std:false, blk:false},
     ],
-    sc,rnd,cur:0,log:[`Round ${rnd} — Target: 21`],
-    phase:mode==="bot"?"play":"pass",
-    mode,settings,p2joined:false,
+    sc, rnd, cur:0,
+    log:[`Round ${rnd} — Target: 21`],
+    phase: mode==="bot" ? "play" : "play",
+    mode, settings, p2joined:false,
   };
 };
 
-const applyT=(gs,pid,tid)=>{
-  const s=JSON.parse(JSON.stringify(gs));
-  const me=s.p[pid],op=s.p[1-pid];
+const applyT = (gs,pid,tid) => {
+  const s = JSON.parse(JSON.stringify(gs));
+  const me = s.p[pid], op = s.p[1-pid];
   if(me.blk){s.log.push(`P${pid+1} blocked!`);return s;}
-  const ix=me.tr.indexOf(tid);if(ix===-1)return s;
-  me.tr.splice(ix,1);me.played.push(tid);
-  const T=getTgt(s.p),harv=me.tbl.includes("harvest");
-  const who=pid===0?(gs.mode==="bot"?"You":"P1"):(gs.mode==="bot"?"Bot":"P2");
-  let msg=`${who}: ${TD[tid]?.n}`;
-  const nm=tid.match(/^card(\d+)$/);
+  const ix = me.tr.indexOf(tid); if(ix===-1) return s;
+  me.tr.splice(ix,1); me.played.push(tid);
+  const T=getTgt(s.p), harv=me.tbl.includes("harvest");
+  const who = pid===0?(gs.mode==="bot"?"You":"P1"):(gs.mode==="bot"?"Bot":"P2");
+  let msg = `${who}: ${TD[tid]?.n}`;
+  const nm = tid.match(/^card(\d+)$/);
   if(nm){
-    const val=+nm[1],di=s.deck.indexOf(val);
+    const val=+nm[1], di=s.deck.indexOf(val);
     if(di!==-1){s.deck.splice(di,1);me.h.push({v:val,fd:false});msg+=` → Drew ${val} (${hSum(me.h)})`;}
     else msg+=` → Not in deck`;
   } else {
@@ -95,35 +96,30 @@ const applyT=(gs,pid,tid)=>{
   }
   if(harv&&tid!=="harvest"){me.tr.push(...rT(1));msg+=` (Harvest+1)`;}
   s.log.push(msg);
-  s.p[0].blk=s.p[1].tbl.includes("destroypp");
-  s.p[1].blk=s.p[0].tbl.includes("destroypp");
-  s.p[1-pid].std=false;
+  s.p[0].blk = s.p[1].tbl.includes("destroypp");
+  s.p[1].blk = s.p[0].tbl.includes("destroypp");
+  s.p[1-pid].std = false;
   return s;
 };
 
-const checkEnd=s=>{
-  if(!s.p[0].std||!s.p[1].std)return s;
+const checkEnd = s => {
+  if(!s.p[0].std||!s.p[1].std) return s;
   const T=getTgt(s.p),[p0,p1]=s.p,s0=hSum(p0.h),s1=hSum(p1.h),b0=s0>T,b1=s1>T;
   let w,msg;
   if(b0&&b1){w=-1;msg="Both busted — Draw!";}
-  else if(b0){w=1;msg=`${s.mode==="bot"?"Bot":"P2"} wins (${s0} vs ${s1})`;}
-  else if(b1){w=0;msg=`${s.mode==="bot"?"You":"P1"} win (${s0} vs ${s1})`;}
-  else{
-    const d0=Math.abs(T-s0),d1=Math.abs(T-s1);
-    if(d0<d1){w=0;msg=`${s.mode==="bot"?"You":"P1"} win! ${s0} vs ${s1}`;}
-    else if(d1<d0){w=1;msg=`${s.mode==="bot"?"Bot":"P2"} wins! ${s1} vs ${s0}`;}
-    else{w=-1;msg=`Draw! Both ${s0}`;}
-  }
+  else if(b0){w=1;msg=`P2 wins (${s0} vs ${s1})`;}
+  else if(b1){w=0;msg=`P1 wins (${s0} vs ${s1})`;}
+  else{const d0=Math.abs(T-s0),d1=Math.abs(T-s1);if(d0<d1){w=0;msg=`P1 wins! ${s0} vs ${s1}`;}else if(d1<d0){w=1;msg=`P2 wins! ${s1} vs ${s0}`;}else{w=-1;msg=`Draw! Both ${s0}`;}}
   const ns=JSON.parse(JSON.stringify(s));
-  ns.winner=w;ns.phase="reveal";
-  if(w>=0)ns.sc[w]++;
+  ns.winner=w; ns.phase="reveal";
+  if(w>=0) ns.sc[w]++;
   ns.log.push(`— ${msg} —`);
   const maxR=ns.settings?.maxRounds||5;
-  if(Math.max(...ns.sc)>=winThreshold(maxR))ns.matchOver=true;
+  if(Math.max(...ns.sc)>=winThreshold(maxR)) ns.matchOver=true;
   return ns;
 };
 
-const botAct=gs=>{
+const botAct = gs => {
   const T=getTgt(gs.p),bot=gs.p[1],opp=gs.p[0],sum=hSum(bot.h);
   if(!bot.blk){
     if(sum>T){
@@ -141,12 +137,12 @@ const botAct=gs=>{
   if(stand){ns.p[1].std=true;ns.log.push(`Bot stands at ${s2}.`);}
   else{const c=ns.deck.shift();ns.p[1].h.push({v:c,fd:false});ns.log.push(`Bot draws (${hSum(ns.p[1].h)})`);ns.p[0].std=false;}
   const ck=checkEnd(ns);
-  if(ck.phase!=="play")return ck;
-  return{...ck,cur:0};
+  if(ck.phase!=="play") return ck;
+  return {...ck,cur:0};
 };
 
-/* ─── STYLES ─────────────────────────────────────────────────────────── */
-const GFX=`
+/* ─── GLOBAL STYLES ──────────────────────────────────────────────────── */
+const GFX = `
   @keyframes cIn{from{opacity:0;transform:translateY(-14px) rotateX(50deg)}to{opacity:1;transform:none}}
   @keyframes cardFlip{0%{transform:perspective(300px) rotateX(4deg) rotateY(0deg) scale(1)}25%{transform:perspective(300px) rotateX(4deg) rotateY(90deg) scale(1.12)}75%{transform:perspective(300px) rotateX(4deg) rotateY(270deg) scale(1.12)}100%{transform:perspective(300px) rotateX(4deg) rotateY(360deg) scale(1)}}
   @keyframes spin{from{transform:rotateY(0)}to{transform:rotateY(360deg)}}
@@ -158,18 +154,17 @@ const GFX=`
   @keyframes timerPulse{0%,100%{opacity:1}50%{opacity:0.6}}
   @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 `;
-const FELT={minHeight:"100vh",background:"radial-gradient(ellipse at 50% 30%,#1a4828 0%,#0c2815 55%,#040c08 100%)",fontFamily:"Georgia,'Times New Roman',serif",color:"#d4c078"};
-const GL="linear-gradient(90deg,transparent,rgba(212,192,120,0.18) 20%,rgba(212,192,120,0.32) 50%,rgba(212,192,120,0.18) 80%,transparent)";
+const FELT = {minHeight:"100vh",background:"radial-gradient(ellipse at 50% 30%,#1a4828 0%,#0c2815 55%,#040c08 100%)",fontFamily:"Georgia,'Times New Roman',serif",color:"#d4c078"};
+const GL = "linear-gradient(90deg,transparent,rgba(212,192,120,0.18) 20%,rgba(212,192,120,0.32) 50%,rgba(212,192,120,0.18) 80%,transparent)";
 
 /* ─── GAME CARD ──────────────────────────────────────────────────────── */
-const GameCard=({v,fd,idx=0,small=false,justFlipped=false})=>{
+const GameCard = ({v,fd,idx=0,small=false,justFlipped=false}) => {
   const t=v?TIER[cTier(v)]:TIER[0];
-  const W=small?44:58,H=small?64:84;
-  return(
+  const W=small?44:58, H=small?64:84;
+  return (
     <div style={{width:W,height:H,flexShrink:0,animation:justFlipped?"cardFlip .55s ease both":`cIn .3s ease ${idx*55}ms both`}}>
-      <div style={{width:"100%",height:"100%",borderRadius:7,transform:"perspective(200px) rotateX(4deg)",
-        boxShadow:fd?"0 6px 18px rgba(0,0,0,0.8)":`0 6px 18px rgba(0,0,0,0.7),0 0 14px ${t.gw}55`}}>
-        {fd?(
+      <div style={{width:"100%",height:"100%",borderRadius:7,transform:"perspective(200px) rotateX(4deg)",boxShadow:fd?"0 6px 18px rgba(0,0,0,0.8)":`0 6px 18px rgba(0,0,0,0.7),0 0 14px ${t.gw}55`}}>
+        {fd ? (
           <div style={{width:"100%",height:"100%",borderRadius:7,background:"linear-gradient(145deg,#400000,#720808)",border:"1.5px solid rgba(200,160,80,0.45)",position:"relative",overflow:"hidden"}}>
             <div style={{position:"absolute",inset:3,borderRadius:5,border:"1px solid rgba(200,160,80,0.15)",backgroundImage:"repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(200,160,80,0.04) 4px,rgba(200,160,80,0.04) 5px)"}}/>
             <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2}}>
@@ -178,7 +173,7 @@ const GameCard=({v,fd,idx=0,small=false,justFlipped=false})=>{
               <div style={{fontSize:7,letterSpacing:2,color:"rgba(200,160,80,0.35)",fontFamily:"Georgia,serif",textTransform:"uppercase"}}>TRUMP</div>
             </div>
           </div>
-        ):(
+        ) : (
           <div style={{width:"100%",height:"100%",borderRadius:7,background:`linear-gradient(145deg,${t.acc},${t.bg})`,border:`1.5px solid ${t.gw}44`,position:"relative",overflow:"hidden"}}>
             <div style={{position:"absolute",inset:0,backgroundImage:`radial-gradient(circle,${t.gw}18 1px,transparent 1px)`,backgroundSize:"6px 6px"}}/>
             <div style={{position:"absolute",top:3,left:4}}>
@@ -201,32 +196,29 @@ const GameCard=({v,fd,idx=0,small=false,justFlipped=false})=>{
 };
 
 /* ─── TRUMP CARD ─────────────────────────────────────────────────────── */
-const TrumpCard=({tid,onClick,disabled,size=62})=>{
+const TrumpCard = ({tid,onClick,disabled,size=62}) => {
   const t=TD[tid];
-  const[tip,setTip]=useState(false);
-  const[tipDir,setTipDir]=useState("center");
+  const [tip,setTip]=useState(false);
+  const [tipDir,setTipDir]=useState("center");
   const hRef=useRef(null);
   const cRef=useRef(null);
   const H=Math.round(size*1.42);
-  if(!t)return null;
-  const enter=()=>{
+  if(!t) return null;
+  const enter = () => {
     if(cRef.current){
       const r=cRef.current.getBoundingClientRect(),tw=200;
-      if(r.left<tw/2+10)setTipDir("right");
-      else if(window.innerWidth-r.right<tw/2+10)setTipDir("left");
+      if(r.left<tw/2+10) setTipDir("right");
+      else if(window.innerWidth-r.right<tw/2+10) setTipDir("left");
       else setTipDir("center");
     }
     hRef.current=setTimeout(()=>setTip(true),900);
   };
-  const leave=()=>{clearTimeout(hRef.current);setTip(false);};
-  const tipPos=tipDir==="right"?{left:0}:tipDir==="left"?{right:0}:{left:"50%",transform:"translateX(-50%)"};
-  return(
+  const leave = () => { clearTimeout(hRef.current); setTip(false); };
+  const tipPos = tipDir==="right"?{left:0}:tipDir==="left"?{right:0}:{left:"50%",transform:"translateX(-50%)"};
+  return (
     <div ref={cRef} style={{position:"relative",width:size,height:H,flexShrink:0}} onMouseEnter={enter} onMouseLeave={leave}>
       <button onClick={onClick} disabled={disabled}
-        style={{width:"100%",height:"100%",padding:0,border:"none",background:"none",cursor:disabled?"not-allowed":"pointer",borderRadius:8,
-          transform:disabled?"none":"perspective(200px) rotateX(4deg)",
-          boxShadow:disabled?"none":`0 5px 14px rgba(0,0,0,0.6),0 0 10px ${t.glow}44,0 4px 0 ${t.color}aa`,
-          transition:"transform 0.15s,box-shadow 0.15s"}}
+        style={{width:"100%",height:"100%",padding:0,border:"none",background:"none",cursor:disabled?"not-allowed":"pointer",borderRadius:8,transform:disabled?"none":"perspective(200px) rotateX(4deg)",boxShadow:disabled?"none":`0 5px 14px rgba(0,0,0,0.6),0 0 10px ${t.glow}44,0 4px 0 ${t.color}aa`,transition:"transform 0.15s,box-shadow 0.15s"}}
         onMouseEnter={e=>{if(!disabled){e.currentTarget.style.transform="perspective(200px) rotateX(0deg) translateY(-6px) scale(1.07)";e.currentTarget.style.boxShadow=`0 14px 28px rgba(0,0,0,0.7),0 0 20px ${t.glow}99,0 6px 0 ${t.color}aa`;}}}
         onMouseLeave={e=>{e.currentTarget.style.transform=disabled?"none":"perspective(200px) rotateX(4deg)";e.currentTarget.style.boxShadow=disabled?"none":`0 5px 14px rgba(0,0,0,0.6),0 0 10px ${t.glow}44,0 4px 0 ${t.color}aa`;}}>
         <div style={{width:"100%",height:"100%",borderRadius:8,background:`linear-gradient(145deg,${t.color}ee,${t.color}88)`,border:`1.5px solid ${t.glow}66`,position:"relative",overflow:"hidden",opacity:disabled?0.25:1}}>
@@ -250,9 +242,9 @@ const TrumpCard=({tid,onClick,disabled,size=62})=>{
 };
 
 /* ─── TABLE TRUMP ────────────────────────────────────────────────────── */
-const TableTrump=({tid,active=false})=>{
-  const t=TD[tid];if(!t)return null;
-  return(
+const TableTrump = ({tid,active=false}) => {
+  const t=TD[tid]; if(!t) return null;
+  return (
     <div style={{width:44,height:62,flexShrink:0,borderRadius:7,background:`linear-gradient(145deg,${t.color}cc,${t.color}66)`,border:`1.5px solid ${active?t.glow+"88":t.glow+"33"}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,boxShadow:active?`0 3px 10px rgba(0,0,0,0.5),0 0 10px ${t.glow}55`:"0 2px 6px rgba(0,0,0,0.4)",opacity:active?1:0.6,position:"relative"}}>
       <div style={{fontSize:18,color:t.glow,textShadow:active?`0 0 12px ${t.glow}`:"none",lineHeight:1}}>{t.sym}</div>
       <div style={{fontSize:5.5,color:`${t.glow}cc`,fontFamily:"Georgia,serif",textTransform:"uppercase",letterSpacing:0.5,textAlign:"center",lineHeight:1.2,padding:"0 3px"}}>{t.n}</div>
@@ -262,7 +254,7 @@ const TableTrump=({tid,active=false})=>{
 };
 
 /* ─── CHIP ───────────────────────────────────────────────────────────── */
-const Chip=({n,color,label})=>(
+const Chip = ({n,color,label}) => (
   <div style={{textAlign:"center"}}>
     <div style={{width:38,height:38,borderRadius:"50%",margin:"0 auto",background:`radial-gradient(circle at 35% 30%,${color}ee,${color}88)`,border:"3px solid rgba(255,255,255,0.18)",boxShadow:`0 4px 10px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.2)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:900,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.8)"}}>{n}</div>
     {label&&<div style={{fontSize:8,color:"#5a4a30",marginTop:4,letterSpacing:0.8,textTransform:"uppercase"}}>{label}</div>}
@@ -270,10 +262,10 @@ const Chip=({n,color,label})=>(
 );
 
 /* ─── LOG ────────────────────────────────────────────────────────────── */
-const LogPanel=({log})=>{
+const LogPanel = ({log}) => {
   const el=useRef(null);
-  useEffect(()=>{if(el.current)el.current.scrollTop=el.current.scrollHeight;},[log]);
-  return(
+  useEffect(()=>{if(el.current) el.current.scrollTop=el.current.scrollHeight;},[log]);
+  return (
     <div ref={el} style={{height:"100%",overflowY:"auto",padding:"6px 8px"}}>
       {log.map((l,i)=><div key={i} style={{fontSize:10.5,color:i===log.length-1?"#d4c078":"#3a3020",padding:"2px 0",lineHeight:1.4,borderBottom:"1px solid rgba(255,255,255,0.02)"}}>{l}</div>)}
     </div>
@@ -281,28 +273,23 @@ const LogPanel=({log})=>{
 };
 
 /* ─── BTN 3D ─────────────────────────────────────────────────────────── */
-const Btn3D=({label,onClick,disabled,top,bot,shad,sx={}})=>{
-  const[pr,setPr]=useState(false);
-  return(
+const Btn3D = ({label,onClick,disabled,top,bot,shad,sx={}}) => {
+  const [pr,setPr]=useState(false);
+  return (
     <button onMouseDown={()=>setPr(true)} onMouseUp={()=>setPr(false)} onMouseLeave={()=>setPr(false)} onClick={onClick} disabled={disabled}
-      style={{padding:"11px 28px",fontSize:14,fontWeight:900,borderRadius:11,border:"none",cursor:disabled?"not-allowed":"pointer",
-        background:disabled?"rgba(8,6,2,0.6)":pr?bot:`linear-gradient(180deg,${top},${bot})`,
-        color:disabled?"#1e1a10":"#fff",
-        boxShadow:disabled?"none":pr?`0 1px 0 ${shad}`:`0 5px 0 ${shad},0 7px 14px rgba(0,0,0,0.5)`,
-        transform:pr?"translateY(4px)":"none",transition:"all 0.09s",letterSpacing:"0.5px",
-        textShadow:disabled?"none":"0 1px 2px rgba(0,0,0,0.5)",fontFamily:"Georgia,serif",...sx}}>
+      style={{padding:"11px 28px",fontSize:14,fontWeight:900,borderRadius:11,border:"none",cursor:disabled?"not-allowed":"pointer",background:disabled?"rgba(8,6,2,0.6)":pr?bot:`linear-gradient(180deg,${top},${bot})`,color:disabled?"#1e1a10":"#fff",boxShadow:disabled?"none":pr?`0 1px 0 ${shad}`:`0 5px 0 ${shad},0 7px 14px rgba(0,0,0,0.5)`,transform:pr?"translateY(4px)":"none",transition:"all 0.09s",letterSpacing:"0.5px",textShadow:disabled?"none":"0 1px 2px rgba(0,0,0,0.5)",fontFamily:"Georgia,serif",...sx}}>
       {label}
     </button>
   );
 };
 
 /* ─── COUNTDOWN TIMER ────────────────────────────────────────────────── */
-const CountdownTimer=({seconds,onExpire,active})=>{
-  const[left,setLeft]=useState(seconds);
-  const[shake,setShake]=useState(false);
+const CountdownTimer = ({seconds,onExpire,active}) => {
+  const [left,setLeft]=useState(seconds);
+  const [shake,setShake]=useState(false);
   useEffect(()=>{setLeft(seconds);},[seconds]);
   useEffect(()=>{
-    if(!active)return;
+    if(!active) return;
     const id=setInterval(()=>{
       setLeft(p=>{
         if(p<=1){clearInterval(id);onExpire();return 0;}
@@ -315,7 +302,7 @@ const CountdownTimer=({seconds,onExpire,active})=>{
   const pct=(left/seconds)*100;
   const urgent=left<=10;
   const col=urgent?"#ef5350":left<=20?"#ffa726":"#69f0ae";
-  return(
+  return (
     <div style={{display:"flex",alignItems:"center",gap:10}}>
       <div style={{position:"relative",width:44,height:44,flexShrink:0,animation:shake?"shake 0.4s ease":"none"}}>
         <svg width="44" height="44" style={{transform:"rotate(-90deg)"}}>
@@ -333,13 +320,13 @@ const CountdownTimer=({seconds,onExpire,active})=>{
 };
 
 /* ─── PLAYER ROW ─────────────────────────────────────────────────────── */
-const PlayerRow=({player,pid,isMe,isBot,mode,T,flippedSet})=>{
-  const s=hSum(player.h),bust=s>T;
+const PlayerRow = ({player,pid,isMe,isBot,mode,T,flippedSet}) => {
+  const s=hSum(player.h), bust=s>T;
   const visSum=player.h.filter(c=>!c.fd).reduce((a,c)=>a+c.v,0);
   const hiddenCount=player.h.filter(c=>c.fd).length;
   const pColor=pid===0?"#7ec8e3":"#f0a080";
   const label=mode==="bot"?(pid===0?"You":"Bot"):(isMe?"You":"Opponent");
-  return(
+  return (
     <div style={{display:"flex",alignItems:"center",gap:16,width:"100%"}}>
       <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,flexShrink:0,width:64}}>
         <div style={{width:44,height:44,borderRadius:"50%",background:pid===0?"#0d2a4a":"#4a0808",border:`2px solid ${pColor}55`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:pid===1&&isBot?20:14,fontWeight:900,color:pColor,boxShadow:`0 2px 8px ${pColor}33`}}>{pid===1&&isBot?"🤖":isMe?"Me":"Opp"}</div>
@@ -352,11 +339,7 @@ const PlayerRow=({player,pid,isMe,isBot,mode,T,flippedSet})=>{
         ))}
       </div>
       <div style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-        <div style={{minWidth:56,height:46,borderRadius:10,
-          background:isMe?(bust?"rgba(100,0,0,0.7)":s===T?"rgba(0,90,35,0.7)":"rgba(5,3,1,0.7)"):"rgba(5,3,1,0.7)",
-          border:`1px solid ${isMe?(bust?"#b02020":s===T?"#2e7d32":"rgba(212,192,120,0.12)"):"rgba(212,192,120,0.12)"}`,
-          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-          boxShadow:isMe&&s===T?"0 0 14px rgba(0,180,70,0.3)":isMe&&bust?"0 0 12px rgba(190,0,0,0.3)":"none"}}>
+        <div style={{minWidth:56,height:46,borderRadius:10,background:isMe?(bust?"rgba(100,0,0,0.7)":s===T?"rgba(0,90,35,0.7)":"rgba(5,3,1,0.7)"):"rgba(5,3,1,0.7)",border:`1px solid ${isMe?(bust?"#b02020":s===T?"#2e7d32":"rgba(212,192,120,0.12)"):"rgba(212,192,120,0.12)"}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",boxShadow:isMe&&s===T?"0 0 14px rgba(0,180,70,0.3)":isMe&&bust?"0 0 12px rgba(190,0,0,0.3)":"none"}}>
           {hiddenCount>0
             ?<div style={{fontSize:12,fontWeight:900,color:"#d4c078",textAlign:"center",padding:"0 4px"}}>?+{visSum}</div>
             :<>
@@ -372,12 +355,12 @@ const PlayerRow=({player,pid,isMe,isBot,mode,T,flippedSet})=>{
 };
 
 /* ─── ROUND END POPUP ────────────────────────────────────────────────── */
-const RoundPopup=({gs,T,myPid,onNext,onHome})=>{
+const RoundPopup = ({gs,T,myPid,onNext,onHome}) => {
   const isBot=gs.mode==="bot";
   const wLabel=gs.winner===-1?"Draw":gs.winner===myPid?"You Win!":"Opponent Wins!";
   const wc=gs.winner===myPid?"#7ec8e3":gs.winner===-1?"#d4c078":"#f0a080";
-  const maxR=gs.settings?.maxRounds||5,need=winThreshold(maxR);
-  return(
+  const maxR=gs.settings?.maxRounds||5, need=winThreshold(maxR);
+  return (
     <div style={{position:"fixed",inset:0,zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.75)"}}>
       <div style={{background:"radial-gradient(ellipse at 50% 20%,#1a3020 0%,#080e0a 100%)",border:"1.5px solid rgba(212,192,120,0.3)",borderRadius:20,padding:"32px 40px",minWidth:420,maxWidth:520,boxShadow:"0 24px 60px rgba(0,0,0,0.9)",animation:"popIn .35s cubic-bezier(0.34,1.56,0.64,1) both",textAlign:"center"}}>
         <div style={{height:2,width:"80%",background:GL,margin:"0 auto 16px",borderRadius:2}}/>
@@ -385,12 +368,12 @@ const RoundPopup=({gs,T,myPid,onNext,onHome})=>{
         <div style={{fontSize:10,color:"#4a4030",letterSpacing:2,marginBottom:18,textTransform:"uppercase"}}>Round {gs.rnd} · First to {need} wins · {maxR}-round match</div>
         <div style={{display:"flex",gap:32,justifyContent:"center",marginBottom:18}}>
           {gs.p.map((p,i)=>{
-            const s=hSum(p.h),b=s>T;
-            return(
+            const sv=hSum(p.h), bv=sv>T;
+            return (
               <div key={i} style={{textAlign:"center"}}>
                 <div style={{color:i===myPid?"#7ec8e3":"#f0a080",fontWeight:700,marginBottom:7,fontSize:11,letterSpacing:1,textTransform:"uppercase"}}>{i===myPid?"You":"Opponent"}</div>
                 <div style={{display:"flex",gap:4,justifyContent:"center"}}>{p.h.map((c,j)=><GameCard key={j} v={c.v} fd={false} idx={j} small/>)}</div>
-                <div style={{marginTop:6,fontSize:18,fontWeight:900,color:b?"#ff5252":"#d4c078"}}>{s}{b?" 💀":""}</div>
+                <div style={{marginTop:6,fontSize:18,fontWeight:900,color:bv?"#ff5252":"#d4c078"}}>{sv}{bv?" 💀":""}</div>
               </div>
             );
           })}
@@ -414,8 +397,8 @@ const RoundPopup=({gs,T,myPid,onNext,onHome})=>{
 };
 
 /* ─── SETTINGS MODAL ─────────────────────────────────────────────────── */
-const SettingsModal=({settings,onChange,onClose})=>{
-  const[s,setS]=useState(settings);
+const SettingsModal = ({settings,onChange,onClose}) => {
+  const [s,setS]=useState(settings);
   const update=k=>v=>setS(p=>({...p,[k]:v}));
   const opts=(vals,cur,set,label,fmt)=>(
     <div style={{marginBottom:16}}>
@@ -427,7 +410,7 @@ const SettingsModal=({settings,onChange,onClose})=>{
       </div>
     </div>
   );
-  return(
+  return (
     <div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.8)"}}>
       <div style={{background:"radial-gradient(ellipse at 50% 0%,#1a3020,#080e0a)",border:"1.5px solid rgba(212,192,120,0.25)",borderRadius:18,padding:"28px 32px",width:380,boxShadow:"0 24px 60px rgba(0,0,0,0.9)",animation:"popIn .3s ease both"}}>
         <div style={{fontSize:16,fontWeight:900,color:"#d4c078",letterSpacing:2,marginBottom:20,textAlign:"center",textTransform:"uppercase"}}>⚙ Room Settings</div>
@@ -443,54 +426,48 @@ const SettingsModal=({settings,onChange,onClose})=>{
 };
 
 /* ─── CREATE ROOM ────────────────────────────────────────────────────── */
-const CreateRoomScreen=({settings,onBack,roomCodeRef,setRoomCode,setMyPid,setGs})=>{
+const CreateRoomScreen = ({settings,onBack,roomCodeRef,setRoomCode,setMyPid,setGs}) => {
   const code=useRef(genCode()).current;
-  const[status,setStatus]=useState("inserting");
-  const[copied,setCopied]=useState(false);
-  const[joinedState,setJoinedState]=useState(null);
+  const [status,setStatus]=useState("inserting");
+  const [copied,setCopied]=useState(false);
+  const [joinedState,setJoinedState]=useState(null);
 
-  // Step 1: insert room on mount
+  // Insert room
   useEffect(()=>{
-    const initialState=mkRound([0,0],1,"pvp",settings,null);
-    initialState.p2joined=false;
-    supabase.from("rooms").insert({code,state:initialState})
+    const init=mkRound([0,0],1,"pvp",settings,null);
+    init.p2joined=false;
+    supabase.from("rooms").insert({code,state:init})
       .then(({error})=>{
         if(error){console.error(error);setStatus("error");}
         else setStatus("waiting");
       });
-  // eslint-disable-next-line
-  },[]);
+  },[]);// eslint-disable-line
 
-  // Step 2: poll every 1.5s once waiting
+  // Poll every 1.5s for p2joined
   useEffect(()=>{
-    if(status!=="waiting")return;
-    const interval=setInterval(async()=>{
-      const{data,error}=await supabase
-        .from("rooms").select("state").eq("code",code).single();
-      if(!error&&data?.state?.p2joined===true){
-        clearInterval(interval);
+    if(status!=="waiting") return;
+    const iv=setInterval(async()=>{
+      const {data,error}=await supabase.from("rooms").select("state").eq("code",code).single();
+      if(!error && data?.state?.p2joined===true){
+        clearInterval(iv);
         setJoinedState(data.state);
       }
     },1500);
-    return()=>clearInterval(interval);
-  // eslint-disable-next-line
-  },[status]);
+    return()=>clearInterval(iv);
+  },[status]);// eslint-disable-line
 
-  // Step 3: when joinedState is set, navigate — separate from polling to avoid stale closures
+  // When joined — update App state (App will navigate via its own useEffect)
   useEffect(()=>{
-    if(!joinedState)return;
+    if(!joinedState) return;
     roomCodeRef.current=code;
     setRoomCode(code);
     setMyPid(0);
     setGs(joinedState);
-    setScreen("game");
-    setTimerKey(k=>k+1);
-  // eslint-disable-next-line
-  },[joinedState]);
+  },[joinedState]);// eslint-disable-line
 
   const copy=()=>{navigator.clipboard?.writeText(code).catch(()=>{});setCopied(true);setTimeout(()=>setCopied(false),2000);};
 
-  return(
+  return (
     <div style={{...FELT,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",gap:24}}>
       <style>{GFX}</style>
       <div style={{textAlign:"center"}}>
@@ -525,17 +502,17 @@ const CreateRoomScreen=({settings,onBack,roomCodeRef,setRoomCode,setMyPid,setGs}
 };
 
 /* ─── JOIN ROOM ──────────────────────────────────────────────────────── */
-const JoinRoomScreen=({onBack,onJoin})=>{
-  const[code,setCode]=useState("");
-  const[err,setErr]=useState("");
-  const[loading,setLoading]=useState(false);
+const JoinRoomScreen = ({onBack,onJoin}) => {
+  const [code,setCode]=useState("");
+  const [err,setErr]=useState("");
+  const [loading,setLoading]=useState(false);
   const submit=async()=>{
     if(code.trim().length<4){setErr("Please enter a valid room code.");return;}
     setLoading(true);setErr("");
     await onJoin(code.trim().toUpperCase());
     setLoading(false);
   };
-  return(
+  return (
     <div style={{...FELT,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",gap:24}}>
       <style>{GFX}</style>
       <div style={{textAlign:"center"}}>
@@ -546,9 +523,7 @@ const JoinRoomScreen=({onBack,onJoin})=>{
         <input value={code} onChange={e=>setCode(e.target.value.toUpperCase().slice(0,8))}
           onKeyDown={e=>e.key==="Enter"&&submit()}
           placeholder="e.g. AB12CD"
-          style={{width:"100%",padding:"14px 16px",fontSize:24,letterSpacing:6,textAlign:"center",fontWeight:900,borderRadius:10,
-            border:`1px solid ${err?"rgba(240,80,80,0.5)":"rgba(212,192,120,0.3)"}`,
-            background:"rgba(0,0,0,0.4)",color:"#d4c078",outline:"none",fontFamily:"Georgia,serif",boxSizing:"border-box",marginBottom:8}}/>
+          style={{width:"100%",padding:"14px 16px",fontSize:24,letterSpacing:6,textAlign:"center",fontWeight:900,borderRadius:10,border:`1px solid ${err?"rgba(240,80,80,0.5)":"rgba(212,192,120,0.3)"}`,background:"rgba(0,0,0,0.4)",color:"#d4c078",outline:"none",fontFamily:"Georgia,serif",boxSizing:"border-box",marginBottom:8}}/>
         {err&&<div style={{fontSize:11,color:"#ff6060",marginBottom:8}}>{err}</div>}
         <Btn3D label={loading?"Joining...":"Join Room"} onClick={submit} disabled={loading} top="#d4a820" bot="#9a7010" shad="#5a4000" sx={{width:"100%",padding:"12px 0"}}/>
       </div>
@@ -558,52 +533,54 @@ const JoinRoomScreen=({onBack,onJoin})=>{
 };
 
 /* ─── MAIN APP ───────────────────────────────────────────────────────── */
-export default function App(){
+export default function App() {
   const DEF_SETTINGS={maxRounds:5,timerSec:30};
-  const[screen,setScreen]=useState("home");
-  const[settings,setSettings]=useState(DEF_SETTINGS);
-  const[showSettings,setShowSettings]=useState(false);
-  const[gs,setGs]=useState(null);
-  const[showLog,setShowLog]=useState(false);
-  const[flippedSet,setFlippedSet]=useState(new Set());
-  const[timerKey,setTimerKey]=useState(0);
-  const[roomCode,setRoomCode]=useState(null);
-  const[myPid,setMyPid]=useState(0);
+  const [screen,setScreen]=useState("home");
+  const [settings,setSettings]=useState(DEF_SETTINGS);
+  const [showSettings,setShowSettings]=useState(false);
+  const [gs,setGs]=useState(null);
+  const [showLog,setShowLog]=useState(false);
+  const [flippedSet,setFlippedSet]=useState(new Set());
+  const [timerKey,setTimerKey]=useState(0);
+  const [roomCode,setRoomCode]=useState(null);
+  const [myPid,setMyPid]=useState(0);
   const botRef=useRef(null);
   const revTimers=useRef([]);
-  const roomCodeRef=useRef(null); // eslint-disable-line
+  const roomCodeRef=useRef(null);
   const lastPushed=useRef(null);
 
-   useEffect(()=>{
-    if(!gs)return;
-    // Host: when p2 joins, gs gets set — navigate to game
-    if(gs.p2joined===true&&screen==="create"){
+  /* ── AUTO-NAVIGATE: when host's gs is set with p2joined, go to game ── */
+  useEffect(()=>{
+    if(!gs) return;
+    if(gs.p2joined===true && screen==="create"){
       setScreen("game");
       setTimerKey(k=>k+1);
     }
-  },[gs]);
+  },[gs]);// eslint-disable-line
 
   /* ── BOT TURN ── */
   useEffect(()=>{
-    if(!gs||gs.phase!=="play"||gs.cur!==1||gs.mode!=="bot")return;
+    if(!gs||gs.phase!=="play"||gs.cur!==1||gs.mode!=="bot") return;
     const d=800+Math.random()*600;
     botRef.current=setTimeout(()=>{
-      setGs(prev=>{if(!prev||prev.phase!=="play"||prev.cur!==1)return prev;return botAct(prev);});
+      setGs(prev=>{if(!prev||prev.phase!=="play"||prev.cur!==1) return prev; return botAct(prev);});
     },d);
     return()=>clearTimeout(botRef.current);
   },[gs]);
 
   /* ── REVEAL ANIMATION ── */
   useEffect(()=>{
-    if(!gs||gs.phase!=="reveal")return;
-    revTimers.current.forEach(clearTimeout);revTimers.current=[];setFlippedSet(new Set());
+    if(!gs||gs.phase!=="reveal") return;
+    revTimers.current.forEach(clearTimeout);
+    revTimers.current=[];
+    setFlippedSet(new Set());
     const flips=[];
-    gs.p.forEach((p,pid)=>p.h.forEach((c,ci)=>{if(c.fd)flips.push({pid,ci,key:`${pid}-${ci}`});}));
+    gs.p.forEach((p,pid)=>p.h.forEach((c,ci)=>{if(c.fd) flips.push({pid,ci,key:`${pid}-${ci}`});}));
     flips.forEach(({pid,ci,key},i)=>{
       const t1=setTimeout(()=>{
         setFlippedSet(prev=>new Set([...prev,key]));
         setGs(prev=>{
-          if(!prev||prev.phase!=="reveal")return prev;
+          if(!prev||prev.phase!=="reveal") return prev;
           const ns=JSON.parse(JSON.stringify(prev));
           ns.p[pid].h[ci].fd=false;
           return ns;
@@ -615,7 +592,7 @@ export default function App(){
     });
     const tF=setTimeout(()=>{
       setGs(prev=>{
-        if(!prev||prev.phase!=="reveal")return prev;
+        if(!prev||prev.phase!=="reveal") return prev;
         const ns=JSON.parse(JSON.stringify(prev));
         ns.phase=ns.matchOver?"matchEnd":"roundEnd";
         return ns;
@@ -623,140 +600,103 @@ export default function App(){
     },500+flips.length*500+700);
     revTimers.current.push(tF);
     return()=>revTimers.current.forEach(clearTimeout);
-  // eslint-disable-next-line
-  },[gs?.phase]);
+  },[gs?.phase]);// eslint-disable-line
 
-  /* ── HOST: wait for player 2 to join ── */
+  /* ── SYNC DURING GAME ── */
   useEffect(()=>{
-    if(!roomCode||screen!=="create")return;
-    const channel=supabase.channel(`host-${roomCode}`)
-      .on("postgres_changes",
-        {event:"UPDATE",schema:"public",table:"rooms",filter:`code=eq.${roomCode}`},
-        (payload)=>{
-          if(payload.new?.state?.p2joined===true){
-            lastPushed.current=JSON.stringify(payload.new.state);
-            setGs(payload.new.state);
-            setScreen("game");
-            setTimerKey(k=>k+1);
-          }
-        }
-      ).subscribe();
-    return()=>supabase.removeChannel(channel);
-  },[roomCode,screen]);
-
-  /* ── BOTH PLAYERS: sync during game ── */
-  useEffect(()=>{
-    if(!roomCode||screen!=="game")return;
+    if(!roomCode||screen!=="game") return;
     const channel=supabase.channel(`game-${roomCode}`)
       .on("postgres_changes",
         {event:"UPDATE",schema:"public",table:"rooms",filter:`code=eq.${roomCode}`},
         (payload)=>{
-          if(!payload.new?.state)return;
-          const incoming=JSON.stringify(payload.new.state);
-          // Don't apply our own push back to us
-          if(incoming===lastPushed.current)return;
-          lastPushed.current=incoming;
+          if(!payload.new?.state) return;
+          const inc=JSON.stringify(payload.new.state);
+          if(inc===lastPushed.current) return;
+          lastPushed.current=inc;
           setGs(payload.new.state);
         }
       ).subscribe();
     return()=>supabase.removeChannel(channel);
   },[roomCode,screen]);
 
-  /* ── PUSH MY MOVES ── */
+  /* ── PUSH MOVES ── */
   useEffect(()=>{
-    if(!roomCode||!gs||screen!=="game")return;
+    if(!roomCode||!gs||screen!=="game") return;
     const str=JSON.stringify(gs);
-    if(str===lastPushed.current)return;
+    if(str===lastPushed.current) return;
     lastPushed.current=str;
     supabase.from("rooms").update({state:gs}).eq("code",roomCode);
-  },[gs,roomCode,screen]);
+  },[gs,roomCode,screen]);// eslint-disable-line
 
-  /* ── GAME HELPERS ── */
-  const startGame=useCallback((mode)=>{
-    setGs(mkRound([0,0],1,mode,settings,null));
-    setScreen("game");setFlippedSet(new Set());setTimerKey(k=>k+1);
-    setMyPid(0);
-  // eslint-disable-next-line
-  },[settings]);
+  /* ── HELPERS ── */
+  const activePid=gs?(gs.mode==="bot"?0:myPid):0;
 
   const advanceAfter=(ns,actingPid)=>{
     ns.p[1-actingPid].std=false;
     const ck=checkEnd(ns);
     if(ck.phase!=="play"){setFlippedSet(new Set());setGs(ck);return;}
     const nx=JSON.parse(JSON.stringify(ck));
-    // For bot mode use pass screen if pvp
-    if(nx.mode==="pvp"){nx.cur=1-actingPid;nx.phase="pass";}
-    else nx.cur=1-actingPid;
-    setGs(nx);setTimerKey(k=>k+1);
+    nx.cur=1-actingPid;
+    setGs(nx);
+    setTimerKey(k=>k+1);
   };
 
-  const activePid=gs?(gs.mode==="bot"?0:myPid):0;
-
   const doTrump=tid=>{
-    if(!gs||gs.phase!=="play"||gs.cur!==activePid||gs.p[activePid].std)return;
+    if(!gs||gs.phase!=="play"||gs.cur!==activePid||gs.p[activePid].std) return;
     const ns=applyT(gs,activePid,tid);
     ns.p[1-activePid].std=false;
-    const ck=checkEnd(ns);if(ck.phase!=="play"){setFlippedSet(new Set());setGs(ck);return;}
+    const ck=checkEnd(ns);
+    if(ck.phase!=="play"){setFlippedSet(new Set());setGs(ck);return;}
     setGs(ns);
   };
 
   const doDraw=useCallback(()=>{
-    if(!gs||gs.phase!=="play"||gs.cur!==activePid||gs.p[activePid].std)return;
+    if(!gs||gs.phase!=="play"||gs.cur!==activePid||gs.p[activePid].std) return;
     const ns=JSON.parse(JSON.stringify(gs));
-    if(ns.deck.length===0){
-      ns.p[activePid].std=true;
-      ns.log.push("Deck empty — forced stand.");
-    } else {
-      const c=ns.deck.shift();
-      ns.p[activePid].h.push({v:c,fd:false});
-      ns.log.push(`P${activePid+1} draws ${c} (${hSum(ns.p[activePid].h)})`);
-    }
+    if(ns.deck.length===0){ns.p[activePid].std=true;ns.log.push("Deck empty — forced stand.");}
+    else{const c=ns.deck.shift();ns.p[activePid].h.push({v:c,fd:false});ns.log.push(`P${activePid+1} draws ${c} (${hSum(ns.p[activePid].h)})`);}
     advanceAfter(ns,activePid);
-  // eslint-disable-next-line
-  },[gs,activePid]);
+  },[gs,activePid]);// eslint-disable-line
 
   const doStand=useCallback(()=>{
-    if(!gs||gs.phase!=="play"||gs.cur!==activePid||gs.p[activePid].std)return;
+    if(!gs||gs.phase!=="play"||gs.cur!==activePid||gs.p[activePid].std) return;
     const ns=JSON.parse(JSON.stringify(gs));
     ns.p[activePid].std=true;
     ns.log.push(`P${activePid+1} stands at ${hSum(ns.p[activePid].h)}.`);
-    const ck=checkEnd(ns);if(ck.phase!=="play"){setFlippedSet(new Set());setGs(ck);return;}
+    const ck=checkEnd(ns);
+    if(ck.phase!=="play"){setFlippedSet(new Set());setGs(ck);return;}
     const nx=JSON.parse(JSON.stringify(ck));
     nx.cur=1-activePid;
-    if(nx.mode==="pvp")nx.phase="play"; // no pass screen in online pvp
-    setGs(nx);setTimerKey(k=>k+1);
-  // eslint-disable-next-line
-  },[gs,activePid]);
+    setGs(nx);
+    setTimerKey(k=>k+1);
+  },[gs,activePid]);// eslint-disable-line
 
   const nextRound=()=>{
-    if(!gs)return;
+    if(!gs) return;
     const ns=mkRound(gs.sc,gs.rnd<(gs.settings?.maxRounds||5)?gs.rnd+1:gs.rnd,gs.mode,gs.settings,[gs.p[0].tr,gs.p[1].tr]);
     setGs(ns);setFlippedSet(new Set());setTimerKey(k=>k+1);
   };
   const newMatch=()=>{
-    if(!gs)return;
+    if(!gs) return;
     setGs(mkRound([0,0],1,gs.mode,settings,null));
     setFlippedSet(new Set());setTimerKey(k=>k+1);
   };
 
   const onTimerExpire=useCallback(()=>{
     setGs(prev=>{
-      if(!prev||prev.phase!=="play"||prev.cur!==activePid||prev.p[activePid].std)return prev;
+      if(!prev||prev.phase!=="play"||prev.cur!==activePid||prev.p[activePid].std) return prev;
       const ns=JSON.parse(JSON.stringify(prev));
       ns.p[activePid].std=true;
       ns.log.push("⏰ Time's up! Auto-stand.");
-      const ck=checkEnd(ns);if(ck.phase!=="play")return ck;
-      const nx=JSON.parse(JSON.stringify(ck));
-      nx.cur=1-activePid;
-      return nx;
+      const ck=checkEnd(ns);if(ck.phase!=="play") return ck;
+      const nx=JSON.parse(JSON.stringify(ck));nx.cur=1-activePid;return nx;
     });
     setTimerKey(k=>k+1);
-  // eslint-disable-next-line
-  },[activePid]);
+  },[activePid]);// eslint-disable-line
 
-  /* ── HOME ── */
+  /* ══ HOME ══════════════════════════════════════════════════════════ */
   if(screen==="home"){
-    return(
+    return (
       <div style={{...FELT,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",gap:36}}>
         <style>{GFX}</style>
         {showSettings&&<SettingsModal settings={settings} onChange={setSettings} onClose={()=>setShowSettings(false)}/>}
@@ -770,9 +710,9 @@ export default function App(){
         <div style={{display:"flex",gap:10}}>{[2,5,7,9,11].map((v,i)=><GameCard key={v} v={v} fd={false} idx={i}/>)}</div>
         <div style={{display:"flex",gap:16,flexWrap:"wrap",justifyContent:"center",animation:"slideIn 0.7s ease 0.2s both"}}>
           {[
-            {id:"bot",label:"vs Bot",sub:"Solo Play",icon:"🤖",action:()=>startGame("bot")},
-            {id:"create",label:"Create Room",sub:"1v1 · Host",icon:"🏠",action:()=>setScreen("create")},
-            {id:"join",label:"Find Room",sub:"1v1 · Join",icon:"🔍",action:()=>setScreen("join")},
+            {id:"bot",  label:"vs Bot",      sub:"Solo Play", icon:"🤖", action:()=>{setMyPid(0);setGs(mkRound([0,0],1,"bot",settings,null));setScreen("game");setTimerKey(k=>k+1);}},
+            {id:"create",label:"Create Room",sub:"1v1 · Host",icon:"🏠", action:()=>setScreen("create")},
+            {id:"join",  label:"Find Room",  sub:"1v1 · Join",icon:"🔍", action:()=>setScreen("join")},
           ].map(m=>(
             <button key={m.id} onClick={m.action}
               style={{width:160,padding:"22px 16px",borderRadius:16,border:"1.5px solid rgba(212,192,120,0.25)",background:"rgba(0,0,0,0.4)",cursor:"pointer",textAlign:"center",transition:"all 0.2s",boxShadow:"0 6px 24px rgba(0,0,0,0.5)"}}
@@ -796,31 +736,27 @@ export default function App(){
     );
   }
 
-  /* ── CREATE / JOIN ── */
-  if(screen==="create")return(
-  <CreateRoomScreen
-    settings={settings}
-    onBack={()=>setScreen("home")}
-    roomCodeRef={roomCodeRef}
-    setRoomCode={setRoomCode}
-    setMyPid={setMyPid}
-    setGs={setGs}
-  />
-);
+  /* ══ CREATE ROOM ═══════════════════════════════════════════════════ */
+  if(screen==="create") return (
+    <CreateRoomScreen
+      settings={settings}
+      onBack={()=>setScreen("home")}
+      roomCodeRef={roomCodeRef}
+      setRoomCode={setRoomCode}
+      setMyPid={setMyPid}
+      setGs={setGs}
+    />
+  );
 
-  if(screen==="join")return(
+  /* ══ JOIN ROOM ═════════════════════════════════════════════════════ */
+  if(screen==="join") return (
     <JoinRoomScreen
       onBack={()=>setScreen("home")}
       onJoin={async(code)=>{
-        const{data,error}=await supabase
-          .from("rooms").select("state").eq("code",code).single();
-        if(!data||error){
-          alert("Room not found! Check the code and try again.");
-          return;
-        }
-        const updatedState={...data.state,p2joined:true};
-        const{error:updateError}=await supabase
-          .from("rooms").update({state:updatedState}).eq("code",code);
+        const {data,error}=await supabase.from("rooms").select("state").eq("code",code).single();
+        if(!data||error){alert("Room not found! Check the code and try again.");return;}
+        const updatedState={...data.state, p2joined:true};
+        const {error:updateError}=await supabase.from("rooms").update({state:updatedState}).eq("code",code);
         if(updateError){alert("Failed to join. Try again.");return;}
         roomCodeRef.current=code;
         setRoomCode(code);
@@ -833,7 +769,7 @@ export default function App(){
     />
   );
 
-  if(!gs)return null;
+  if(!gs) return null;
 
   const T=getTgt(gs.p);
   const isBot=gs.mode==="bot";
@@ -844,10 +780,10 @@ export default function App(){
   const isRevealing=gs.phase==="reveal";
   const showPopup=gs.phase==="roundEnd";
 
-  /* ── MATCH END ── */
+  /* ══ MATCH END ═════════════════════════════════════════════════════ */
   if(gs.phase==="matchEnd"){
     const mw=gs.sc[myPid]>=winThreshold(gs.settings?.maxRounds||5)?"You":"Opponent";
-    return(
+    return (
       <div style={{...FELT,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",gap:20}}>
         <style>{GFX}</style>
         <div style={{fontSize:72,animation:"spin 4s linear infinite"}}>🏆</div>
@@ -867,12 +803,11 @@ export default function App(){
     );
   }
 
-  /* ── PLAY + REVEAL + POPUP ── */
-  return(
+  /* ══ PLAY / REVEAL / POPUP ════════════════════════════════════════ */
+  return (
     <div style={{...FELT,minHeight:"100vh",display:"flex",gap:0,position:"relative"}}>
       <style>{GFX}</style>
 
-      {/* Reveal banner */}
       {isRevealing&&(
         <div style={{position:"fixed",inset:0,zIndex:40,pointerEvents:"none"}}>
           <div style={{position:"absolute",top:0,left:0,right:0,display:"flex",justifyContent:"center",paddingTop:18}}>
@@ -883,7 +818,6 @@ export default function App(){
         </div>
       )}
 
-      {/* Round end popup */}
       {showPopup&&(
         <RoundPopup gs={gs} T={T} myPid={myPid}
           onNext={gs.rnd<(gs.settings?.maxRounds||5)?nextRound:newMatch}
@@ -934,14 +868,13 @@ export default function App(){
           )}
         </div>
 
-        {/* Table */}
+        {/* Table zone */}
         <div style={{margin:"10px 0",background:"rgba(0,0,0,0.15)",borderRadius:12,border:"1px solid rgba(212,192,120,0.07)",padding:"10px 16px",display:"flex",flexDirection:"column",gap:8}}>
           <div style={{height:1,background:GL,borderRadius:1}}/>
           <div style={{display:"flex",gap:8,alignItems:"center",minHeight:66}}>
             <div style={{fontSize:8,letterSpacing:1.5,color:"#2a2015",textTransform:"uppercase",width:56,flexShrink:0,textAlign:"right",paddingRight:10,lineHeight:1.4}}>Opp<br/>played</div>
             <div style={{display:"flex",gap:5,flexWrap:"wrap",flex:1,alignItems:"center"}}>
-              {op.played.length>0
-                ?op.played.map((t,i)=><TableTrump key={i} tid={t} active={op.tbl.includes(t)}/>)
+              {op.played.length>0?op.played.map((t,i)=><TableTrump key={i} tid={t} active={op.tbl.includes(t)}/>)
                 :<div style={{fontSize:9,color:"#1a1408",fontStyle:"italic"}}>no trump cards played yet</div>}
             </div>
           </div>
@@ -953,8 +886,7 @@ export default function App(){
           <div style={{display:"flex",gap:8,alignItems:"center",minHeight:66}}>
             <div style={{fontSize:8,letterSpacing:1.5,color:"#2a2015",textTransform:"uppercase",width:56,flexShrink:0,textAlign:"right",paddingRight:10,lineHeight:1.4}}>You<br/>played</div>
             <div style={{display:"flex",gap:5,flexWrap:"wrap",flex:1,alignItems:"center"}}>
-              {me.played.length>0
-                ?me.played.map((t,i)=><TableTrump key={i} tid={t} active={me.tbl.includes(t)}/>)
+              {me.played.length>0?me.played.map((t,i)=><TableTrump key={i} tid={t} active={me.tbl.includes(t)}/>)
                 :<div style={{fontSize:9,color:"#1a1408",fontStyle:"italic"}}>no trump cards played yet</div>}
             </div>
           </div>
@@ -962,12 +894,8 @@ export default function App(){
         </div>
 
         {/* My zone */}
-        <div style={{background:"rgba(0,0,0,0.28)",borderRadius:14,padding:"14px 16px",
-          border:`1px solid ${isRevealing?"rgba(212,192,64,0.18)":myTurn?"rgba(212,192,64,0.25)":"rgba(212,192,120,0.06)"}`,
-          boxShadow:myTurn?"0 0 20px rgba(212,192,64,0.06)":"none",transition:"border-color 0.3s"}}>
+        <div style={{background:"rgba(0,0,0,0.28)",borderRadius:14,padding:"14px 16px",border:`1px solid ${isRevealing?"rgba(212,192,64,0.18)":myTurn?"rgba(212,192,64,0.25)":"rgba(212,192,120,0.06)"}`,boxShadow:myTurn?"0 0 20px rgba(212,192,64,0.06)":"none",transition:"border-color 0.3s"}}>
           <PlayerRow player={me} pid={activePid} isMe={true} isBot={false} mode={gs.mode} T={T} flippedSet={flippedSet}/>
-
-          {/* Trump cards — always shown */}
           <div style={{marginTop:12,paddingTop:10,borderTop:"1px solid rgba(212,192,120,0.07)"}}>
             <div style={{fontSize:8,letterSpacing:2,color:"#2a2015",textTransform:"uppercase",marginBottom:8}}>
               Your Trump Cards ({me.tr.length}){me.tr.length>0?" — hover 1s for details":""}
@@ -978,18 +906,14 @@ export default function App(){
                 :<div style={{fontSize:10,color:"#1a1408",fontStyle:"italic"}}>No trump cards in hand</div>}
             </div>
           </div>
-
           {myTurn&&hSum(me.h)>T&&(
             <div style={{marginTop:10,padding:"6px 12px",borderRadius:8,background:"rgba(80,0,0,0.4)",border:"1px solid rgba(180,40,40,0.3)",fontSize:11,color:"#ff8080",lineHeight:1.5}}>
               ⚠ Over {T}! Use a trump card to recover, or Stand to lock in your bust.
             </div>
           )}
-
           <div style={{display:"flex",gap:10,marginTop:12}}>
             {isRevealing?(
-              <div style={{padding:"10px 16px",borderRadius:10,background:"rgba(0,0,0,0.2)",border:"1px solid rgba(212,192,120,0.1)",fontSize:12,color:"#6a5820",fontStyle:"italic",letterSpacing:1}}>
-                Revealing all hidden cards...
-              </div>
+              <div style={{padding:"10px 16px",borderRadius:10,background:"rgba(0,0,0,0.2)",border:"1px solid rgba(212,192,120,0.1)",fontSize:12,color:"#6a5820",fontStyle:"italic",letterSpacing:1}}>Revealing all hidden cards...</div>
             ):myTurn?(
               <>
                 <Btn3D label="DRAW" onClick={doDraw} disabled={gs.deck.length===0} top="#1a4a7a" bot="#0c2a4a" shad="#050f20"/>
@@ -1004,7 +928,6 @@ export default function App(){
         </div>
       </div>
 
-      {/* Side log */}
       {showLog&&(
         <div style={{width:230,flexShrink:0,background:"rgba(0,0,0,0.45)",borderLeft:"1px solid rgba(212,192,120,0.07)",padding:"16px 0",display:"flex",flexDirection:"column"}}>
           <div style={{fontSize:9,letterSpacing:3,color:"#3a3020",textTransform:"uppercase",padding:"0 12px",marginBottom:8}}>Round Log</div>
