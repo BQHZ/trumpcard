@@ -297,44 +297,74 @@ const SettingsModal=({settings,onChange,onClose})=>{
 /* ─── CREATE ROOM SCREEN ─────────────────────────────────────────────── */
 const CreateRoomScreen=({settings,onBack,roomCodeRef,mkRound,setGs,setScreen})=>{
   const code=useRef(genCode()).current;
-  const[copied,setCopied]=useState(false);
-  const copy=()=>{navigator.clipboard?.writeText(code).catch(()=>{});setCopied(true);setTimeout(()=>setCopied(false),2000);};
+  const [status,setStatus]=useState("inserting");
+  const [copied,setCopied]=useState(false);
+
+  useEffect(()=>{
+    const insertRoom=async()=>{
+      const initialState=mkRound([0,0],1,"pvp",settings,null);
+      initialState.p2joined=false;
+      const{error}=await supabase
+        .from("rooms")
+        .insert({code,state:initialState});
+      if(error){setStatus("error");return;}
+      roomCodeRef.current=code;
+      setStatus("waiting");
+      const channel=supabase.channel(`host:${code}`)
+        .on("postgres_changes",
+          {event:"UPDATE",schema:"public",table:"rooms",filter:`code=eq.${code}`},
+          (payload)=>{
+            if(payload.new.state?.p2joined===true){
+              setGs(payload.new.state);
+              setScreen("game");
+            }
+          }
+        ).subscribe();
+      return()=>supabase.removeChannel(channel);
+    };
+    insertRoom();
+  },[]);
+
+  const copy=()=>{
+    navigator.clipboard?.writeText(code).catch(()=>{});
+    setCopied(true);setTimeout(()=>setCopied(false),2000);
+  };
+
   return(<div style={{...FELT,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",gap:24}}>
     <style>{GFX}</style>
     <div style={{textAlign:"center"}}>
-      <div style={{fontSize:11,letterSpacing:5,color:"#5a4820",textTransform:"uppercase",marginBottom:6}}>Room Created</div>
-      <div style={{fontSize:22,fontWeight:900,color:"#d4c078"}}>Share this code with your opponent</div>
-    </div>
-    <div style={{background:"rgba(0,0,0,0.5)",border:"1.5px solid rgba(212,192,120,0.3)",borderRadius:16,padding:"28px 40px",textAlign:"center",boxShadow:"0 12px 40px rgba(0,0,0,0.6)"}}>
-      <div style={{fontSize:11,letterSpacing:3,color:"#5a4820",textTransform:"uppercase",marginBottom:10}}>Room Code</div>
-      <div style={{fontSize:48,fontWeight:900,color:"#d4c078",letterSpacing:8,textShadow:"0 0 30px rgba(212,192,64,0.3)",marginBottom:16}}>{code}</div>
-      <button onClick={copy} style={{padding:"8px 24px",borderRadius:10,border:"1px solid rgba(212,192,120,0.3)",background:copied?"rgba(100,200,100,0.15)":"rgba(212,192,120,0.08)",color:copied?"#8bc34a":"#d4c078",cursor:"pointer",fontSize:13,fontFamily:"Georgia,serif",transition:"all 0.2s"}}>
-        {copied?"✓ Copied!":"Copy Code"}
-      </button>
-    </div>
-    <div style={{background:"rgba(0,0,0,0.35)",borderRadius:12,padding:"14px 20px",border:"1px solid rgba(212,192,120,0.1)",maxWidth:380,textAlign:"center"}}>
-      <div style={{fontSize:11,color:"#5a4820",lineHeight:1.7}}>
-        <b style={{color:"#8a7040"}}>To host on Vercel:</b> connect a real-time backend like{" "}
-        <span style={{color:"#7ec8e3"}}>Supabase Realtime</span>, <span style={{color:"#7ec8e3"}}>Pusher</span>, or <span style={{color:"#7ec8e3"}}>Ably</span> to sync game state across devices. The room code system and UI are fully built — just wire up the sync layer.
+      <div style={{fontSize:11,letterSpacing:5,color:"#5a4820",textTransform:"uppercase",marginBottom:6}}>
+        {status==="inserting"?"Creating Room...":status==="error"?"Error!":"Room Ready"}
+      </div>
+      <div style={{fontSize:22,fontWeight:900,color:"#d4c078"}}>
+        {status==="waiting"?"Waiting for opponent to join...":status==="error"?"Failed to create room":"Setting up..."}
       </div>
     </div>
-    <div style={{display:"flex",gap:12}}>
-      <Btn3D label="← Back" onClick={onBack} top="#3a3020" bot="#1a1810" shad="#0a0804"/>
-      <Btn3D label="Start (Same Device)" onClick={async () => {
-  const initialState = mkRound([0,0], 1, "pvp", settings, null);
-  const { error } = await supabase
-    .from('rooms')
-    .insert({ code, state: initialState });
-  if (error) {
-    alert('Failed to create room. Please try again.');
-    return;
-  }
-  roomCodeRef.current = code;
-  setGs(initialState);
-  setScreen('game');
-}}/>
-    </div>
-    <div style={{fontSize:10,color:"#2a2015",textAlign:"center"}}>Settings: {settings.maxRounds} rounds · {settings.timerSec}s timer</div>
+
+    {status==="waiting"&&(<>
+      <div style={{background:"rgba(0,0,0,0.5)",border:"1.5px solid rgba(212,192,120,0.3)",borderRadius:16,padding:"28px 40px",textAlign:"center",boxShadow:"0 12px 40px rgba(0,0,0,0.6)"}}>
+        <div style={{fontSize:11,letterSpacing:3,color:"#5a4820",textTransform:"uppercase",marginBottom:10}}>Room Code</div>
+        <div style={{fontSize:48,fontWeight:900,color:"#d4c078",letterSpacing:8,textShadow:"0 0 30px rgba(212,192,64,0.3)",marginBottom:16}}>{code}</div>
+        <button onClick={copy} style={{padding:"8px 24px",borderRadius:10,border:"1px solid rgba(212,192,120,0.3)",background:copied?"rgba(100,200,100,0.15)":"rgba(212,192,120,0.08)",color:copied?"#8bc34a":"#d4c078",cursor:"pointer",fontSize:13,fontFamily:"Georgia,serif",transition:"all 0.2s"}}>
+          {copied?"✓ Copied!":"Copy Code"}
+        </button>
+      </div>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        {[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:"#c08040",animation:`pulse 1s ease ${i*0.25}s infinite`}}/>)}
+        <span style={{fontSize:13,color:"#6a5820",marginLeft:6,fontStyle:"italic"}}>Waiting for Player 2...</span>
+      </div>
+      <div style={{fontSize:10,color:"#2a2015"}}>Settings: {settings.maxRounds} rounds · {settings.timerSec}s timer</div>
+    </>)}
+
+    {status==="error"&&(
+      <div style={{fontSize:13,color:"#ff8080"}}>Could not create room. Check your connection and try again.</div>
+    )}
+
+    {status==="inserting"&&(
+      <div style={{display:"flex",gap:8}}>{[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:"#c08040",animation:`pulse 1s ease ${i*0.25}s infinite`}}/>)}</div>
+    )}
+
+    <Btn3D label="← Back" onClick={onBack} top="#3a3020" bot="#1a1810" shad="#0a0804"/>
   </div>);
 };
 
@@ -553,19 +583,29 @@ useEffect(() => {
   />;
   if(screen==="join")return<JoinRoomScreen
   onBack={()=>setScreen("home")}
-  onJoin={async (code) => {
-    const { data, error } = await supabase
-      .from('rooms')
-      .select('state')
-      .eq('code', code)
+  onJoin={async(code)=>{
+    const{data,error}=await supabase
+      .from("rooms")
+      .select("state")
+      .eq("code",code)
       .single();
-    if (!data || error) {
-      alert('Room not found! Check the code and try again.');
+    if(!data||error){
+      alert("Room not found! Check the code and try again.");
       return;
     }
-    roomCodeRef.current = code;
-    setGs(data.state);
-    setScreen('game');
+    // Mark player 2 as joined
+    const updatedState={...data.state,p2joined:true};
+    const{error:updateError}=await supabase
+      .from("rooms")
+      .update({state:updatedState})
+      .eq("code",code);
+    if(updateError){
+      alert("Failed to join room. Try again.");
+      return;
+    }
+    roomCodeRef.current=code;
+    setGs(updatedState);
+    setScreen("game");
   }}
 />;
 
