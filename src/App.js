@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 
 import { useState, useEffect, useRef, useCallback } from "react";
+const [roomCode, setRoomCode] = useState(null);
+const [myPid, setMyPid] = useState(0);
 
 /* ─── TRUMP DEFS ─────────────────────────────────────────────────────── */
 const TD={card2:{n:"2 Card",sym:"Ⅱ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 2 from the deck. If unavailable, nothing happens."},card3:{n:"3 Card",sym:"Ⅲ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 3. If unavailable, nothing happens."},card4:{n:"4 Card",sym:"Ⅳ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 4. If unavailable, nothing happens."},card5:{n:"5 Card",sym:"Ⅴ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 5. If unavailable, nothing happens."},card6:{n:"6 Card",sym:"Ⅵ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 6. If unavailable, nothing happens."},card7:{n:"7 Card",sym:"Ⅶ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 7. If unavailable, nothing happens."},remove:{n:"Remove",sym:"⌫",color:"#7f0000",glow:"#f44336",d:"Remove the last face-up card your opponent drew. It goes back to the deck."},ret:{n:"Return",sym:"↺",color:"#0d47a1",glow:"#2196f3",d:"Return your own last face-up card to the deck."},exchange:{n:"Exchange",sym:"⇌",color:"#4a148c",glow:"#9c27b0",d:"Swap your last face-up card with your opponent's last face-up card."},switch:{n:"Switch",sym:"⟲",color:"#bf360c",glow:"#ff5722",d:"Discard 2 trump cards at random, draw 3 new ones."},switchp:{n:"Switch+",sym:"⟳",color:"#870000",glow:"#e53935",d:"Discard 1 trump card at random, draw 4 new ones."},shield:{n:"Shield",sym:"◬",color:"#37474f",glow:"#90a4ae",d:"Place Shield on the table. (No active effect in current rules.)"},shieldp:{n:"Shield+",sym:"◭",color:"#263238",glow:"#607d8b",d:"Stronger version of Shield. (No active effect.)"},destroy:{n:"Destroy",sym:"✦",color:"#880e4f",glow:"#e91e63",d:"Destroy the last trump card your opponent placed on the table."},destroyp:{n:"Destroy+",sym:"✧",color:"#560027",glow:"#c2185b",d:"Destroy ALL trump cards your opponent has on the table."},destroypp:{n:"Destroy++",sym:"☩",color:"#1a0033",glow:"#7b1fa2",d:"Clear all opponent table trumps AND block their trump use while this stays on the table."},pdraw:{n:"Perf. Draw",sym:"⊛",color:"#7a5800",glow:"#ffc107",d:"Draw the best possible card — closest to target without busting."},pdrawp:{n:"Perf.Draw+",sym:"⊕",color:"#5a4000",glow:"#ffb300",d:"Draw the best possible card from the deck."},udraw:{n:"Ult. Draw",sym:"⊗",color:"#4a3000",glow:"#ff8f00",d:"Draw the best possible card, then draw 2 additional trump cards."},go17:{n:"Go for 17",sym:"⑰",color:"#3e2723",glow:"#8d6e63",d:"Change the round target to 17. Replaces any existing Go For card."},go24:{n:"Go for 24",sym:"㉔",color:"#004d40",glow:"#26a69a",d:"Change the round target to 24. Replaces any existing Go For card."},go27:{n:"Go for 27",sym:"㉗",color:"#1a237e",glow:"#5c6bc0",d:"Change the round target to 27. Replaces any existing Go For card."},harvest:{n:"Harvest",sym:"✿",color:"#33691e",glow:"#8bc34a",d:"Place Harvest on table. Draw 1 bonus trump after each trump you play."}};
@@ -295,40 +297,40 @@ const SettingsModal=({settings,onChange,onClose})=>{
 };
 
 /* ─── CREATE ROOM SCREEN ─────────────────────────────────────────────── */
-const CreateRoomScreen=({settings,onBack,roomCodeRef,mkRound,setGs,setScreen})=>{
+const CreateRoomScreen=({settings,onBack,roomCodeRef,mkRound,setGs,setScreen,setRoomCode,setMyPid})=>{
   const code=useRef(genCode()).current;
-  const [status,setStatus]=useState("inserting");
-  const [copied,setCopied]=useState(false);
+  const[status,setStatus]=useState("inserting");
+  const[copied,setCopied]=useState(false);
 
   useEffect(()=>{
-    const insertRoom=async()=>{
-      const initialState=mkRound([0,0],1,"pvp",settings,null);
-      initialState.p2joined=false;
-      const{error}=await supabase
-        .from("rooms")
-        .insert({code,state:initialState});
-      if(error){setStatus("error");return;}
-      roomCodeRef.current=code;
-      setStatus("waiting");
-      const channel=supabase.channel(`host:${code}`)
-        .on("postgres_changes",
-          {event:"UPDATE",schema:"public",table:"rooms",filter:`code=eq.${code}`},
-          (payload)=>{
-            if(payload.new.state?.p2joined===true){
-              setGs(payload.new.state);
-              setScreen("game");
+    let channel;
+    const initialState=mkRound([0,0],1,"pvp",settings,null);
+    initialState.p2joined=false;
+
+    supabase.from("rooms").insert({code,state:initialState})
+      .then(({error})=>{
+        if(error){setStatus("error");return;}
+        roomCodeRef.current=code;
+        setRoomCode(code);
+        setMyPid(0);
+        setStatus("waiting");
+
+        channel=supabase.channel(`host-waiting-${code}`)
+          .on("postgres_changes",
+            {event:"UPDATE",schema:"public",table:"rooms",filter:`code=eq.${code}`},
+            (payload)=>{
+              if(payload.new?.state?.p2joined===true){
+                setGs(payload.new.state);
+                setScreen("game");
+              }
             }
-          }
-        ).subscribe();
-      return()=>supabase.removeChannel(channel);
-    };
-    insertRoom();
+          ).subscribe();
+      });
+
+    return()=>{if(channel)supabase.removeChannel(channel);};
   },[]);
 
-  const copy=()=>{
-    navigator.clipboard?.writeText(code).catch(()=>{});
-    setCopied(true);setTimeout(()=>setCopied(false),2000);
-  };
+  const copy=()=>{navigator.clipboard?.writeText(code).catch(()=>{});setCopied(true);setTimeout(()=>setCopied(false),2000);};
 
   return(<div style={{...FELT,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",gap:24}}>
     <style>{GFX}</style>
@@ -337,15 +339,14 @@ const CreateRoomScreen=({settings,onBack,roomCodeRef,mkRound,setGs,setScreen})=>
         {status==="inserting"?"Creating Room...":status==="error"?"Error!":"Room Ready"}
       </div>
       <div style={{fontSize:22,fontWeight:900,color:"#d4c078"}}>
-        {status==="waiting"?"Waiting for opponent to join...":status==="error"?"Failed to create room":"Setting up..."}
+        {status==="waiting"?"Waiting for opponent...":status==="error"?"Failed to create room":"Setting up..."}
       </div>
     </div>
-
     {status==="waiting"&&(<>
-      <div style={{background:"rgba(0,0,0,0.5)",border:"1.5px solid rgba(212,192,120,0.3)",borderRadius:16,padding:"28px 40px",textAlign:"center",boxShadow:"0 12px 40px rgba(0,0,0,0.6)"}}>
+      <div style={{background:"rgba(0,0,0,0.5)",border:"1.5px solid rgba(212,192,120,0.3)",borderRadius:16,padding:"28px 40px",textAlign:"center"}}>
         <div style={{fontSize:11,letterSpacing:3,color:"#5a4820",textTransform:"uppercase",marginBottom:10}}>Room Code</div>
-        <div style={{fontSize:48,fontWeight:900,color:"#d4c078",letterSpacing:8,textShadow:"0 0 30px rgba(212,192,64,0.3)",marginBottom:16}}>{code}</div>
-        <button onClick={copy} style={{padding:"8px 24px",borderRadius:10,border:"1px solid rgba(212,192,120,0.3)",background:copied?"rgba(100,200,100,0.15)":"rgba(212,192,120,0.08)",color:copied?"#8bc34a":"#d4c078",cursor:"pointer",fontSize:13,fontFamily:"Georgia,serif",transition:"all 0.2s"}}>
+        <div style={{fontSize:48,fontWeight:900,color:"#d4c078",letterSpacing:8,marginBottom:16}}>{code}</div>
+        <button onClick={copy} style={{padding:"8px 24px",borderRadius:10,border:"1px solid rgba(212,192,120,0.3)",background:copied?"rgba(100,200,100,0.15)":"rgba(212,192,120,0.08)",color:copied?"#8bc34a":"#d4c078",cursor:"pointer",fontSize:13,fontFamily:"Georgia,serif"}}>
           {copied?"✓ Copied!":"Copy Code"}
         </button>
       </div>
@@ -353,17 +354,12 @@ const CreateRoomScreen=({settings,onBack,roomCodeRef,mkRound,setGs,setScreen})=>
         {[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:"#c08040",animation:`pulse 1s ease ${i*0.25}s infinite`}}/>)}
         <span style={{fontSize:13,color:"#6a5820",marginLeft:6,fontStyle:"italic"}}>Waiting for Player 2...</span>
       </div>
-      <div style={{fontSize:10,color:"#2a2015"}}>Settings: {settings.maxRounds} rounds · {settings.timerSec}s timer</div>
     </>)}
-
-    {status==="error"&&(
-      <div style={{fontSize:13,color:"#ff8080"}}>Could not create room. Check your connection and try again.</div>
+    {(status==="inserting"||status==="error")&&(
+      <div style={{fontSize:13,color:status==="error"?"#ff8080":"#6a5820"}}>
+        {status==="error"?"Could not create room. Try again.":"Creating room..."}
+      </div>
     )}
-
-    {status==="inserting"&&(
-      <div style={{display:"flex",gap:8}}>{[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:"#c08040",animation:`pulse 1s ease ${i*0.25}s infinite`}}/>)}</div>
-    )}
-
     <Btn3D label="← Back" onClick={onBack} top="#3a3020" bot="#1a1810" shad="#0a0804"/>
   </div>);
 };
@@ -420,23 +416,26 @@ export default function App(){
   const roomCodeRef = useRef(null);
 
 // Listen for opponent's moves
-useEffect(() => {
-  const code = roomCodeRef.current;
-  if (!code) return;
-  const channel = supabase.channel(`room:${code}`)
-    .on('postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `code=eq.${code}` },
-      (payload) => setGs(payload.new.state)
+useEffect(()=>{
+  if(!roomCode)return;
+  const channel=supabase.channel(`room-sync-${roomCode}`)
+    .on("postgres_changes",
+      {event:"UPDATE",schema:"public",table:"rooms",filter:`code=eq.${roomCode}`},
+      (payload)=>{
+        if(payload.new?.state){
+          setGs(payload.new.state);
+        }
+      }
     ).subscribe();
-  return () => supabase.removeChannel(channel);
-}, [roomCodeRef.current]);
+  return()=>supabase.removeChannel(channel);
+},[roomCode]);
 
-// Push your moves to opponent
-useEffect(() => {
-  const code = roomCodeRef.current;
-  if (!code || !gs) return;
-  supabase.from('rooms').update({ state: gs }).eq('code', code);
-}, [gs]);
+// Push your moves to Supabase
+useEffect(()=>{
+  if(!roomCode||!gs)return;
+  if(gs.phase==="reveal"||gs.phase==="roundEnd"||gs.phase==="matchEnd")return;
+  supabase.from("rooms").update({state:gs}).eq("code",roomCode);
+},[gs]);
 
   // Reveal animation
   useEffect(()=>{
@@ -473,27 +472,26 @@ useEffect(() => {
   };
 
   const doTrump=tid=>{
-    if(!gs||gs.phase!=="play"||gs.cur!==0||gs.p[0].std)return;
-    const ns=applyT(gs,0,tid);ns.p[1].std=false;
-    const ck=checkEnd(ns);if(ck.phase!=="play"){setFlippedSet(new Set());setGs(ck);return;}
-    setGs(ns);
-  };
+  if(!gs||gs.phase!=="play"||gs.cur!==myPid||gs.p[myPid].std)return;
+  const ns=applyT(gs,myPid,tid);
+  ns.p[1-myPid].std=false;
+  const ck=checkEnd(ns);if(ck.phase!=="play"){setFlippedSet(new Set());setGs(ck);return;}
+  setGs(ns);
+};
   const doDraw=useCallback(()=>{
-    if(!gs||gs.phase!=="play"||gs.cur!==0||gs.p[0].std)return;
-    const ns=JSON.parse(JSON.stringify(gs));
-    if(ns.deck.length===0){ns.p[0].std=true;ns.log.push("Deck empty — you stand.");}
-    else{const c=ns.deck.shift();ns.p[0].h.push({v:c,fd:false});ns.log.push(`You draw ${c} (${hSum(ns.p[0].h)})`);}
-    advanceAfter(ns,0);
-  },[gs]);
+  if(!gs||gs.phase!=="play"||gs.cur!==myPid||gs.p[myPid].std)return;
+  const ns=JSON.parse(JSON.stringify(gs));
+  if(ns.deck.length===0){ns.p[myPid].std=true;ns.log.push("Deck empty — forced stand.");}
+  else{const c=ns.deck.shift();ns.p[myPid].h.push({v:c,fd:false});ns.log.push(`P${myPid+1} draws ${c} (${hSum(ns.p[myPid].h)})`);}
+  advanceAfter(ns,myPid);
+},[gs,myPid]);
   const doStand=useCallback(()=>{
-    if(!gs||gs.phase!=="play"||gs.cur!==0||gs.p[0].std)return;
-    const ns=JSON.parse(JSON.stringify(gs));
-    ns.p[0].std=true;ns.log.push(`You stand at ${hSum(ns.p[0].h)}.`);
-    const ck=checkEnd(ns);if(ck.phase!=="play"){setFlippedSet(new Set());setGs(ck);return;}
-    const nx=JSON.parse(JSON.stringify(ck));
-    if(nx.mode==="pvp"){nx.cur=1;nx.phase="pass";}else nx.cur=1;
-    setGs(nx);setTimerKey(k=>k+1);
-  },[gs]);
+  if(!gs||gs.phase!=="play"||gs.cur!==myPid||gs.p[myPid].std)return;
+  const ns=JSON.parse(JSON.stringify(gs));
+  ns.p[myPid].std=true;ns.log.push(`P${myPid+1} stands at ${hSum(ns.p[myPid].h)}.`);
+  const ck=checkEnd(ns);if(ck.phase!=="play"){setFlippedSet(new Set());setGs(ck);return;}
+  const nx=JSON.parse(JSON.stringify(ck));nx.cur=1-myPid;setGs(nx);
+},[gs,myPid]);
 
   const nextRound=()=>{
     if(!gs)return;
@@ -573,14 +571,16 @@ useEffect(() => {
     </div>);
   }
 
-  if(screen==="create")return<CreateRoomScreen 
+  if(screen==="create")return<CreateRoomScreen
   settings={settings}
   onBack={()=>setScreen("home")}
   roomCodeRef={roomCodeRef}
   mkRound={mkRound}
   setGs={setGs}
   setScreen={setScreen}
-  />;
+  setRoomCode={setRoomCode}
+  setMyPid={setMyPid}
+/>;
   if(screen==="join")return<JoinRoomScreen
   onBack={()=>setScreen("home")}
   onJoin={async(code)=>{
@@ -593,17 +593,18 @@ useEffect(() => {
       alert("Room not found! Check the code and try again.");
       return;
     }
-    // Mark player 2 as joined
     const updatedState={...data.state,p2joined:true};
     const{error:updateError}=await supabase
       .from("rooms")
       .update({state:updatedState})
       .eq("code",code);
     if(updateError){
-      alert("Failed to join room. Try again.");
+      alert("Failed to join. Try again.");
       return;
     }
     roomCodeRef.current=code;
+    setRoomCode(code);
+    setMyPid(1);
     setGs(updatedState);
     setScreen("game");
   }}
@@ -613,7 +614,9 @@ useEffect(() => {
   const T=getTgt(gs.p),p0=gs.p[0],p1=gs.p[1];
   const isBot=gs.mode==="bot";
   const botThinking=isBot&&gs.cur===1&&gs.phase==="play";
-  const myTurn=gs.phase==="play"&&gs.cur===0&&!p0.std;
+  const myTurn=gs.phase==="play"&&gs.cur===myPid&&!gs.p[myPid].std;
+  const me=gs.p[myPid];
+  const op=gs.p[1-myPid];
   const isRevealing=gs.phase==="reveal";
 
   /* PASS */
