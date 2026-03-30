@@ -443,24 +443,50 @@ const SettingsModal=({settings,onChange,onClose})=>{
 };
 
 /* ─── CREATE ROOM ────────────────────────────────────────────────────── */
-const CreateRoomScreen=({settings,onBack,roomCodeRef,setRoomCode,setMyPid})=>{
+const CreateRoomScreen=({settings,onBack,roomCodeRef,setRoomCode,setMyPid,setGs,setScreen,setTimerKey})=>{
   const code=useRef(genCode()).current;
   const[status,setStatus]=useState("inserting");
   const[copied,setCopied]=useState(false);
+  const[joinedState,setJoinedState]=useState(null);
 
+  // Step 1: insert room on mount
   useEffect(()=>{
     const initialState=mkRound([0,0],1,"pvp",settings,null);
     initialState.p2joined=false;
     supabase.from("rooms").insert({code,state:initialState})
       .then(({error})=>{
-        if(error){console.error(error);setStatus("error");return;}
-        roomCodeRef.current=code;
-        setRoomCode(code);
-        setMyPid(0);
-        setStatus("waiting");
+        if(error){console.error(error);setStatus("error");}
+        else setStatus("waiting");
       });
   // eslint-disable-next-line
   },[]);
+
+  // Step 2: poll every 1.5s once waiting
+  useEffect(()=>{
+    if(status!=="waiting")return;
+    const interval=setInterval(async()=>{
+      const{data,error}=await supabase
+        .from("rooms").select("state").eq("code",code).single();
+      if(!error&&data?.state?.p2joined===true){
+        clearInterval(interval);
+        setJoinedState(data.state);
+      }
+    },1500);
+    return()=>clearInterval(interval);
+  // eslint-disable-next-line
+  },[status]);
+
+  // Step 3: when joinedState is set, navigate — separate from polling to avoid stale closures
+  useEffect(()=>{
+    if(!joinedState)return;
+    roomCodeRef.current=code;
+    setRoomCode(code);
+    setMyPid(0);
+    setGs(joinedState);
+    setScreen("game");
+    setTimerKey(k=>k+1);
+  // eslint-disable-next-line
+  },[joinedState]);
 
   const copy=()=>{navigator.clipboard?.writeText(code).catch(()=>{});setCopied(true);setTimeout(()=>setCopied(false),2000);};
 
@@ -763,17 +789,14 @@ export default function App(){
 
   /* ── CREATE / JOIN ── */
   if(screen==="create")return(
-  <CreateRoomScreen
-    settings={settings}
-    onBack={()=>setScreen("home")}
-    roomCodeRef={roomCodeRef}
-    setRoomCode={setRoomCode}
-    setMyPid={setMyPid}
-    setGs={setGs}
-    setScreen={setScreen}
-    setTimerKey={setTimerKey}
-  />
-);
+    <CreateRoomScreen
+      settings={settings}
+      onBack={()=>setScreen("home")}
+      roomCodeRef={roomCodeRef}
+      setRoomCode={setRoomCode}
+      setMyPid={setMyPid}
+    />
+  );
 
   if(screen==="join")return(
     <JoinRoomScreen
