@@ -1,8 +1,7 @@
 import { supabase } from './supabase';
 
 import { useState, useEffect, useRef, useCallback } from "react";
-const [roomCode, setRoomCode] = useState(null);
-const [myPid, setMyPid] = useState(0);
+
 
 /* ─── TRUMP DEFS ─────────────────────────────────────────────────────── */
 const TD={card2:{n:"2 Card",sym:"Ⅱ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 2 from the deck. If unavailable, nothing happens."},card3:{n:"3 Card",sym:"Ⅲ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 3. If unavailable, nothing happens."},card4:{n:"4 Card",sym:"Ⅳ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 4. If unavailable, nothing happens."},card5:{n:"5 Card",sym:"Ⅴ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 5. If unavailable, nothing happens."},card6:{n:"6 Card",sym:"Ⅵ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 6. If unavailable, nothing happens."},card7:{n:"7 Card",sym:"Ⅶ",color:"#1b5e20",glow:"#4caf50",d:"Draw the card valued 7. If unavailable, nothing happens."},remove:{n:"Remove",sym:"⌫",color:"#7f0000",glow:"#f44336",d:"Remove the last face-up card your opponent drew. It goes back to the deck."},ret:{n:"Return",sym:"↺",color:"#0d47a1",glow:"#2196f3",d:"Return your own last face-up card to the deck."},exchange:{n:"Exchange",sym:"⇌",color:"#4a148c",glow:"#9c27b0",d:"Swap your last face-up card with your opponent's last face-up card."},switch:{n:"Switch",sym:"⟲",color:"#bf360c",glow:"#ff5722",d:"Discard 2 trump cards at random, draw 3 new ones."},switchp:{n:"Switch+",sym:"⟳",color:"#870000",glow:"#e53935",d:"Discard 1 trump card at random, draw 4 new ones."},shield:{n:"Shield",sym:"◬",color:"#37474f",glow:"#90a4ae",d:"Place Shield on the table. (No active effect in current rules.)"},shieldp:{n:"Shield+",sym:"◭",color:"#263238",glow:"#607d8b",d:"Stronger version of Shield. (No active effect.)"},destroy:{n:"Destroy",sym:"✦",color:"#880e4f",glow:"#e91e63",d:"Destroy the last trump card your opponent placed on the table."},destroyp:{n:"Destroy+",sym:"✧",color:"#560027",glow:"#c2185b",d:"Destroy ALL trump cards your opponent has on the table."},destroypp:{n:"Destroy++",sym:"☩",color:"#1a0033",glow:"#7b1fa2",d:"Clear all opponent table trumps AND block their trump use while this stays on the table."},pdraw:{n:"Perf. Draw",sym:"⊛",color:"#7a5800",glow:"#ffc107",d:"Draw the best possible card — closest to target without busting."},pdrawp:{n:"Perf.Draw+",sym:"⊕",color:"#5a4000",glow:"#ffb300",d:"Draw the best possible card from the deck."},udraw:{n:"Ult. Draw",sym:"⊗",color:"#4a3000",glow:"#ff8f00",d:"Draw the best possible card, then draw 2 additional trump cards."},go17:{n:"Go for 17",sym:"⑰",color:"#3e2723",glow:"#8d6e63",d:"Change the round target to 17. Replaces any existing Go For card."},go24:{n:"Go for 24",sym:"㉔",color:"#004d40",glow:"#26a69a",d:"Change the round target to 24. Replaces any existing Go For card."},go27:{n:"Go for 27",sym:"㉗",color:"#1a237e",glow:"#5c6bc0",d:"Change the round target to 27. Replaces any existing Go For card."},harvest:{n:"Harvest",sym:"✿",color:"#33691e",glow:"#8bc34a",d:"Place Harvest on table. Draw 1 bonus trump after each trump you play."}};
@@ -404,6 +403,8 @@ export default function App(){
   const[timerKey,setTimerKey]=useState(0);
   const botRef=useRef(null);
   const revTimers=useRef([]);
+  const [roomCode, setRoomCode] = useState(null);
+  const [myPid, setMyPid] = useState(0);
 
   // Bot turn
   useEffect(()=>{
