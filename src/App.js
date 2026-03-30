@@ -295,7 +295,7 @@ const SettingsModal=({settings,onChange,onClose})=>{
 };
 
 /* ─── CREATE ROOM SCREEN ─────────────────────────────────────────────── */
-const CreateRoomScreen=({settings,onBack})=>{
+const CreateRoomScreen=({settings,onBack,gs,roomCodeRef})=>{
   const code=useRef(genCode()).current;
   const[copied,setCopied]=useState(false);
   const copy=()=>{navigator.clipboard?.writeText(code).catch(()=>{});setCopied(true);setTimeout(()=>setCopied(false),2000);};
@@ -531,7 +531,7 @@ useEffect(() => {
     </div>);
   }
 
-  if(screen==="create")return<CreateRoomScreen settings={settings} onBack={()=>setScreen("home")}/>;
+  if(screen==="create")return<CreateRoomScreen settings={settings} onBack={()=>setScreen("home")} gs={gs} roomCodeRef={roomCodeRef}/>;
   if(screen==="join")return<JoinRoomScreen
   onBack={()=>setScreen("home")}
   onJoin={async (code) => {
