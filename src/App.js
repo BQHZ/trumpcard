@@ -976,11 +976,11 @@ export default function App() {
                 :<div style={{fontSize:10,color:"#1a1408",fontStyle:"italic"}}>No trump cards in hand</div>}
             </div>
           </div>
-          {myTurn&&hSum(me.h)>T&&(
+          {/* {myTurn&&hSum(me.h)>T&&(
             <div style={{marginTop:10,padding:"6px 12px",borderRadius:8,background:"rgba(80,0,0,0.4)",border:"1px solid rgba(180,40,40,0.3)",fontSize:11,color:"#ff8080",lineHeight:1.5}}>
               ⚠ Over {T}! Use a trump card to recover, or Stand to lock in your bust.
             </div>
-          )}
+          )} */}
           <div style={{display:"flex",gap:10,marginTop:12}}>
             {isRevealing?(
               <div style={{padding:"10px 16px",borderRadius:10,background:"rgba(0,0,0,0.2)",border:"1px solid rgba(212,192,120,0.1)",fontSize:12,color:"#6a5820",fontStyle:"italic",letterSpacing:1}}>Revealing all hidden cards...</div>
