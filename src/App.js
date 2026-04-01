@@ -143,6 +143,9 @@ const botAct = gs => {
 
 /* ─── GLOBAL STYLES ──────────────────────────────────────────────────── */
 const GFX = `
+  *::-webkit-scrollbar{width:3px;height:3px;}
+  *::-webkit-scrollbar-track{background:transparent;}
+  *::-webkit-scrollbar-thumb{background:rgba(212,192,120,0.2);border-radius:3px;}
   @keyframes cIn{from{opacity:0;transform:translateY(-14px) rotateX(50deg)}to{opacity:1;transform:none}}
   @keyframes cardFlip{0%{transform:perspective(300px) rotateX(4deg) rotateY(0deg) scale(1)}25%{transform:perspective(300px) rotateX(4deg) rotateY(90deg) scale(1.12)}75%{transform:perspective(300px) rotateX(4deg) rotateY(270deg) scale(1.12)}100%{transform:perspective(300px) rotateX(4deg) rotateY(360deg) scale(1)}}
   @keyframes spin{from{transform:rotateY(0)}to{transform:rotateY(360deg)}}
@@ -335,7 +338,7 @@ const PlayerRow = ({player,pid,isMe,isBot,mode,T,flippedSet}) => {
         <div style={{fontSize:9,color:pColor,fontWeight:700,letterSpacing:0.5,textAlign:"center"}}>{label}</div>
         <div style={{fontSize:8,color:player.std?"#8bc34a":player.blk?"#f44336":"#3a3020"}}>{player.std?"STAND":player.blk?"BLOCKED":"ACTIVE"}</div>
       </div>
-      <div style={{display:"flex",gap:6,alignItems:"center",flex:1,flexWrap:"wrap"}}>
+      <div style={{display:"flex",gap:6,alignItems:"center",flex:1,flexWrap:"nowrap",overflowX:"auto"}}>
         {viewHand.map((c,i)=>(
           <GameCard key={i} v={c.v} fd={c.fd} idx={i} justFlipped={!!flippedSet&&flippedSet.has(`${pid}-${i}`)}/>
         ))}
@@ -551,6 +554,7 @@ export default function App() {
   const revTimers=useRef([]);
   const roomCodeRef=useRef(null);
   const lastPushed=useRef(0);
+  const gameRef=useRef(null);
 
   /* ── AUTO-NAVIGATE: when host's gs is set with p2joined, go to game ── */
   useEffect(()=>{
@@ -560,6 +564,23 @@ export default function App() {
       setTimerKey(k=>k+1);
     }
   },[gs]);// eslint-disable-line
+
+  /* ── AUTO-SCALE game to fit viewport ── */
+  useEffect(()=>{
+    if(screen!=="game"||!gameRef.current) return;
+    const measure=()=>{
+      const el=gameRef.current;
+      if(!el) return;
+      const vh=window.innerHeight;
+      el.style.transform="scale(1)";
+      const natural=el.scrollHeight;
+      const s=natural>vh?vh/natural:1;
+      el.style.transform=s<1?`scale(${s})`:"none";
+    };
+    const raf=requestAnimationFrame(measure);
+    window.addEventListener("resize",measure);
+    return()=>{window.removeEventListener("resize",measure);cancelAnimationFrame(raf);};
+  });
 
   /* ── BOT TURN ── */
   useEffect(()=>{
@@ -854,8 +875,8 @@ export default function App() {
 
   /* ══ PLAY / REVEAL / POPUP ════════════════════════════════════════ */
   return (
-    <div style={{...FELT,minHeight:"100vh",display:"flex",gap:0,position:"relative"}}>
-      <style>{GFX}</style>
+    <div style={{...FELT,height:"100vh",display:"flex",gap:0,position:"relative",overflow:"hidden"}}>
+      <style>{GFX}{`html,body{margin:0;padding:0;overflow:hidden;height:100%;}`}</style>
 
       {isRevealing&&(
         <div style={{position:"fixed",inset:0,zIndex:40,pointerEvents:"none"}}>
@@ -873,7 +894,7 @@ export default function App() {
           onHome={()=>setScreen("home")}/>
       )}
 
-      <div style={{flex:1,display:"flex",flexDirection:"column",padding:"16px 20px 16px 16px",gap:0,minWidth:0}}>
+      <div ref={gameRef} style={{flex:1,display:"flex",flexDirection:"column",padding:"16px 20px 16px 16px",gap:0,minWidth:0,transformOrigin:"top center"}}>
 
         {/* Header */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,background:"rgba(0,0,0,0.38)",borderRadius:12,padding:"10px 16px",border:"1px solid rgba(212,192,120,0.08)"}}>
@@ -955,11 +976,11 @@ export default function App() {
                 :<div style={{fontSize:10,color:"#1a1408",fontStyle:"italic"}}>No trump cards in hand</div>}
             </div>
           </div>
-          {myTurn&&hSum(me.h)>T&&(
+          {/* {myTurn&&hSum(me.h)>T&&(
             <div style={{marginTop:10,padding:"6px 12px",borderRadius:8,background:"rgba(80,0,0,0.4)",border:"1px solid rgba(180,40,40,0.3)",fontSize:11,color:"#ff8080",lineHeight:1.5}}>
               ⚠ Over {T}! Use a trump card to recover, or Stand to lock in your bust.
             </div>
-          )}
+          )} */}
           <div style={{display:"flex",gap:10,marginTop:12}}>
             {isRevealing?(
               <div style={{padding:"10px 16px",borderRadius:10,background:"rgba(0,0,0,0.2)",border:"1px solid rgba(212,192,120,0.1)",fontSize:12,color:"#6a5820",fontStyle:"italic",letterSpacing:1}}>Revealing all hidden cards...</div>
