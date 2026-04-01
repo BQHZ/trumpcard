@@ -52,8 +52,8 @@ const mkRound = (sc,rnd,mode,settings,prevTr) => {
   return {
     deck: d.slice(4),
     p: [
-      {h:[{v:d[0],fd:false},{v:d[1],fd:false}], tr:[...(prevTr?.[0]||[]),...rT(2)], tbl:[], played:[], std:false, blk:false},
-      {h:[{v:d[2],fd:true}, {v:d[3],fd:false}], tr:[...(prevTr?.[1]||[]),...rT(2)], tbl:[], played:[], std:false, blk:false},
+      {h:[{v:d[0],fd:true},{v:d[1],fd:false}], tr:[...(prevTr?.[0]||[]),...rT(2)], tbl:[], played:[], std:false, blk:false},
+      {h:[{v:d[2],fd:true},{v:d[3],fd:false}], tr:[...(prevTr?.[1]||[]),...rT(2)], tbl:[], played:[], std:false, blk:false},
     ],
     sc, rnd, cur:0,
     log:[`Round ${rnd} — Target: 21`],
@@ -321,9 +321,11 @@ const CountdownTimer = ({seconds,onExpire,active}) => {
 
 /* ─── PLAYER ROW ─────────────────────────────────────────────────────── */
 const PlayerRow = ({player,pid,isMe,isBot,mode,T,flippedSet}) => {
-  const s=hSum(player.h), bust=s>T;
-  const visSum=player.h.filter(c=>!c.fd).reduce((a,c)=>a+c.v,0);
-  const hiddenCount=player.h.filter(c=>c.fd).length;
+  // For "me": see all cards face-up. For opponent: respect fd flag.
+  const viewHand = player.h.map(c=>({...c, fd: isMe ? false : c.fd}));
+  const s=hSum(viewHand), bust=s>T;
+  const visSum=viewHand.filter(c=>!c.fd).reduce((a,c)=>a+c.v,0);
+  const hiddenCount=viewHand.filter(c=>c.fd).length;
   const pColor=pid===0?"#7ec8e3":"#f0a080";
   const label=mode==="bot"?(pid===0?"You":"Bot"):(isMe?"You":"Opponent");
   return (
@@ -334,7 +336,7 @@ const PlayerRow = ({player,pid,isMe,isBot,mode,T,flippedSet}) => {
         <div style={{fontSize:8,color:player.std?"#8bc34a":player.blk?"#f44336":"#3a3020"}}>{player.std?"STAND":player.blk?"BLOCKED":"ACTIVE"}</div>
       </div>
       <div style={{display:"flex",gap:6,alignItems:"center",flex:1,flexWrap:"wrap"}}>
-        {player.h.map((c,i)=>(
+        {viewHand.map((c,i)=>(
           <GameCard key={i} v={c.v} fd={c.fd} idx={i} justFlipped={!!flippedSet&&flippedSet.has(`${pid}-${i}`)}/>
         ))}
       </div>
@@ -426,7 +428,7 @@ const SettingsModal = ({settings,onChange,onClose}) => {
 };
 
 /* ─── CREATE ROOM ────────────────────────────────────────────────────── */
-const CreateRoomScreen = ({settings,onBack,roomCodeRef,setRoomCode,setMyPid,setGs}) => {
+const CreateRoomScreen = ({settings,onBack,roomCodeRef,setRoomCode,setMyPid,setGs,lastPushed}) => {
   const code=useRef(genCode()).current;
   const [status,setStatus]=useState("inserting");
   const [copied,setCopied]=useState(false);
@@ -462,6 +464,7 @@ const CreateRoomScreen = ({settings,onBack,roomCodeRef,setRoomCode,setMyPid,setG
     roomCodeRef.current=code;
     setRoomCode(code);
     setMyPid(0);
+    lastPushed.current=JSON.stringify(joinedState);
     setGs(joinedState);
   },[joinedState]);// eslint-disable-line
 
@@ -548,6 +551,7 @@ export default function App() {
   const revTimers=useRef([]);
   const roomCodeRef=useRef(null);
   const lastPushed=useRef(null);
+  const needsPush=useRef(false);
 
   /* ── AUTO-NAVIGATE: when host's gs is set with p2joined, go to game ── */
   useEffect(()=>{
@@ -595,6 +599,8 @@ export default function App() {
         if(!prev||prev.phase!=="reveal") return prev;
         const ns=JSON.parse(JSON.stringify(prev));
         ns.phase=ns.matchOver?"matchEnd":"roundEnd";
+        // Push final state for PvP sync
+        if(roomCodeRef.current) pushState(ns);
         return ns;
       });
     },500+flips.length*500+700);
@@ -620,13 +626,18 @@ export default function App() {
   },[roomCode,screen]);
 
   /* ── PUSH MOVES ── */
-  useEffect(()=>{
-    if(!roomCode||!gs||screen!=="game") return;
-    const str=JSON.stringify(gs);
-    if(str===lastPushed.current) return;
+  const pushState = useCallback((newGs)=>{
+    if(!roomCodeRef.current) return;
+    const str=JSON.stringify(newGs);
     lastPushed.current=str;
-    supabase.from("rooms").update({state:gs}).eq("code",roomCode);
-  },[gs,roomCode,screen]);// eslint-disable-line
+    supabase.from("rooms").update({state:newGs}).eq("code",roomCodeRef.current);
+  },[]);
+
+  // Helper: set game state AND push to DB (for player-initiated actions)
+  const setGsAndPush = useCallback((newGs)=>{
+    setGs(newGs);
+    pushState(newGs);
+  },[pushState]);
 
   /* ── HELPERS ── */
   const activePid=gs?(gs.mode==="bot"?0:myPid):0;
@@ -634,10 +645,10 @@ export default function App() {
   const advanceAfter=(ns,actingPid)=>{
     ns.p[1-actingPid].std=false;
     const ck=checkEnd(ns);
-    if(ck.phase!=="play"){setFlippedSet(new Set());setGs(ck);return;}
+    if(ck.phase!=="play"){setFlippedSet(new Set());setGsAndPush(ck);return;}
     const nx=JSON.parse(JSON.stringify(ck));
     nx.cur=1-actingPid;
-    setGs(nx);
+    setGsAndPush(nx);
     setTimerKey(k=>k+1);
   };
 
@@ -646,8 +657,8 @@ export default function App() {
     const ns=applyT(gs,activePid,tid);
     ns.p[1-activePid].std=false;
     const ck=checkEnd(ns);
-    if(ck.phase!=="play"){setFlippedSet(new Set());setGs(ck);return;}
-    setGs(ns);
+    if(ck.phase!=="play"){setFlippedSet(new Set());setGsAndPush(ck);return;}
+    setGsAndPush(ns);
   };
 
   const doDraw=useCallback(()=>{
@@ -664,33 +675,34 @@ export default function App() {
     ns.p[activePid].std=true;
     ns.log.push(`P${activePid+1} stands at ${hSum(ns.p[activePid].h)}.`);
     const ck=checkEnd(ns);
-    if(ck.phase!=="play"){setFlippedSet(new Set());setGs(ck);return;}
+    if(ck.phase!=="play"){setFlippedSet(new Set());setGsAndPush(ck);return;}
     const nx=JSON.parse(JSON.stringify(ck));
     nx.cur=1-activePid;
-    setGs(nx);
+    setGsAndPush(nx);
     setTimerKey(k=>k+1);
   },[gs,activePid]);// eslint-disable-line
 
   const nextRound=()=>{
     if(!gs) return;
     const ns=mkRound(gs.sc,gs.rnd<(gs.settings?.maxRounds||5)?gs.rnd+1:gs.rnd,gs.mode,gs.settings,[gs.p[0].tr,gs.p[1].tr]);
-    setGs(ns);setFlippedSet(new Set());setTimerKey(k=>k+1);
+    setGsAndPush(ns);setFlippedSet(new Set());setTimerKey(k=>k+1);
   };
   const newMatch=()=>{
     if(!gs) return;
-    setGs(mkRound([0,0],1,gs.mode,settings,null));
+    const ns=mkRound([0,0],1,gs.mode,settings,null);
+    setGsAndPush(ns);
     setFlippedSet(new Set());setTimerKey(k=>k+1);
   };
 
   const onTimerExpire=useCallback(()=>{
-    setGs(prev=>{
-      if(!prev||prev.phase!=="play"||prev.cur!==activePid||prev.p[activePid].std) return prev;
-      const ns=JSON.parse(JSON.stringify(prev));
-      ns.p[activePid].std=true;
-      ns.log.push("⏰ Time's up! Auto-stand.");
-      const ck=checkEnd(ns);if(ck.phase!=="play") return ck;
-      const nx=JSON.parse(JSON.stringify(ck));nx.cur=1-activePid;return nx;
-    });
+    if(!gs||gs.phase!=="play"||gs.cur!==activePid||gs.p[activePid].std) return;
+    const ns=JSON.parse(JSON.stringify(gs));
+    ns.p[activePid].std=true;
+    ns.log.push("⏰ Time's up! Auto-stand.");
+    const ck=checkEnd(ns);
+    if(ck.phase!=="play"){setGsAndPush(ck);return;}
+    const nx=JSON.parse(JSON.stringify(ck));nx.cur=1-activePid;
+    setGsAndPush(nx);
     setTimerKey(k=>k+1);
   },[activePid]);// eslint-disable-line
 
@@ -745,6 +757,7 @@ export default function App() {
       setRoomCode={setRoomCode}
       setMyPid={setMyPid}
       setGs={setGs}
+      lastPushed={lastPushed}
     />
   );
 
