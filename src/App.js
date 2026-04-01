@@ -338,7 +338,7 @@ const PlayerRow = ({player,pid,isMe,isBot,mode,T,flippedSet}) => {
         <div style={{fontSize:9,color:pColor,fontWeight:700,letterSpacing:0.5,textAlign:"center"}}>{label}</div>
         <div style={{fontSize:8,color:player.std?"#8bc34a":player.blk?"#f44336":"#3a3020"}}>{player.std?"STAND":player.blk?"BLOCKED":"ACTIVE"}</div>
       </div>
-      <div style={{display:"flex",gap:6,alignItems:"center",flex:1,flexWrap:"nowrap",overflowX:"auto"}}>
+      <div style={{display:"flex",gap:6,alignItems:"center",flex:1,flexWrap:"nowrap",padding:"15px",overflowX:"auto", overflowY: "hidden"}}>
         {viewHand.map((c,i)=>(
           <GameCard key={i} v={c.v} fd={c.fd} idx={i} justFlipped={!!flippedSet&&flippedSet.has(`${pid}-${i}`)}/>
         ))}
@@ -970,7 +970,7 @@ export default function App() {
             <div style={{fontSize:8,letterSpacing:2,color:"#2a2015",textTransform:"uppercase",marginBottom:8}}>
               Your Trump Cards ({me.tr.length}){me.tr.length>0?" — hover 1s for details":""}
             </div>
-            <div style={{display:"flex",gap:7,flexWrap:"nowrap",minHeight:88,alignItems:"center",overflowX:"auto"}}>
+            <div style={{display:"flex",gap:7,flexWrap:"nowrap",minHeight:85, paddingTop:30,paddingBottom:10,paddingLeft:10,alignItems:"center",overflowX:"auto", overflowY:"hidden"}}>
               {me.tr.length>0
                 ?me.tr.map((tid,i)=><TrumpCard key={i} tid={tid} disabled={me.blk||me.std||isRevealing||!myTurn} onClick={()=>doTrump(tid)}/>)
                 :<div style={{fontSize:10,color:"#1a1408",fontStyle:"italic"}}>No trump cards in hand</div>}
