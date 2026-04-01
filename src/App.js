@@ -165,7 +165,7 @@ const GameCard = ({v,fd,idx=0,small=false,justFlipped=false}) => {
   const t=v?TIER[cTier(v)]:TIER[0];
   const W=small?44:58, H=small?64:84;
   return (
-    <div style={{width:W,height:H,flexShrink:1,minWidth:small?24:30,animation:justFlipped?"cardFlip .55s ease both":`cIn .3s ease ${idx*55}ms both`}}>
+    <div style={{width:W,height:H,flexShrink:0,minWidth:small?24:30,animation:justFlipped?"cardFlip .55s ease both":`cIn .3s ease ${idx*55}ms both`}}>
       <div style={{width:"100%",height:"100%",borderRadius:7,transform:"perspective(200px) rotateX(4deg)",boxShadow:fd?"0 6px 18px rgba(0,0,0,0.8)":`0 6px 18px rgba(0,0,0,0.7),0 0 14px ${t.gw}55`}}>
         {fd ? (
           <div style={{width:"100%",height:"100%",borderRadius:7,background:"linear-gradient(145deg,#400000,#720808)",border:"1.5px solid rgba(200,160,80,0.45)",position:"relative",overflow:"hidden"}}>
