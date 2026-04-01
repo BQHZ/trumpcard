@@ -165,7 +165,7 @@ const GameCard = ({v,fd,idx=0,small=false,justFlipped=false}) => {
   const t=v?TIER[cTier(v)]:TIER[0];
   const W=small?44:58, H=small?64:84;
   return (
-    <div style={{width:W,height:H,flexShrink:0,animation:justFlipped?"cardFlip .55s ease both":`cIn .3s ease ${idx*55}ms both`}}>
+    <div style={{width:W,height:H,flexShrink:1,minWidth:small?24:30,animation:justFlipped?"cardFlip .55s ease both":`cIn .3s ease ${idx*55}ms both`}}>
       <div style={{width:"100%",height:"100%",borderRadius:7,transform:"perspective(200px) rotateX(4deg)",boxShadow:fd?"0 6px 18px rgba(0,0,0,0.8)":`0 6px 18px rgba(0,0,0,0.7),0 0 14px ${t.gw}55`}}>
         {fd ? (
           <div style={{width:"100%",height:"100%",borderRadius:7,background:"linear-gradient(145deg,#400000,#720808)",border:"1.5px solid rgba(200,160,80,0.45)",position:"relative",overflow:"hidden"}}>
@@ -219,7 +219,7 @@ const TrumpCard = ({tid,onClick,disabled,size=62}) => {
   const leave = () => { clearTimeout(hRef.current); setTip(false); };
   const tipPos = tipDir==="right"?{left:0}:tipDir==="left"?{right:0}:{left:"50%",transform:"translateX(-50%)"};
   return (
-    <div ref={cRef} style={{position:"relative",width:size,height:H,flexShrink:0}} onMouseEnter={enter} onMouseLeave={leave}>
+    <div ref={cRef} style={{position:"relative",width:size,height:H,flexShrink:1,minWidth:35}} onMouseEnter={enter} onMouseLeave={leave}>
       <button onClick={onClick} disabled={disabled}
         style={{width:"100%",height:"100%",padding:0,border:"none",background:"none",cursor:disabled?"not-allowed":"pointer",borderRadius:8,transform:disabled?"none":"perspective(200px) rotateX(4deg)",boxShadow:disabled?"none":`0 5px 14px rgba(0,0,0,0.6),0 0 10px ${t.glow}44,0 4px 0 ${t.color}aa`,transition:"transform 0.15s,box-shadow 0.15s"}}
         onMouseEnter={e=>{if(!disabled){e.currentTarget.style.transform="perspective(200px) rotateX(0deg) translateY(-6px) scale(1.07)";e.currentTarget.style.boxShadow=`0 14px 28px rgba(0,0,0,0.7),0 0 20px ${t.glow}99,0 6px 0 ${t.color}aa`;}}}
@@ -970,17 +970,17 @@ export default function App() {
             <div style={{fontSize:8,letterSpacing:2,color:"#2a2015",textTransform:"uppercase",marginBottom:8}}>
               Your Trump Cards ({me.tr.length}){me.tr.length>0?" — hover 1s for details":""}
             </div>
-            <div style={{display:"flex",gap:7,flexWrap:"wrap",minHeight:88,alignItems:"center"}}>
+            <div style={{display:"flex",gap:7,flexWrap:"nowrap",minHeight:88,alignItems:"center",overflowX:"auto"}}>
               {me.tr.length>0
                 ?me.tr.map((tid,i)=><TrumpCard key={i} tid={tid} disabled={me.blk||me.std||isRevealing||!myTurn} onClick={()=>doTrump(tid)}/>)
                 :<div style={{fontSize:10,color:"#1a1408",fontStyle:"italic"}}>No trump cards in hand</div>}
             </div>
           </div>
-          {/* {myTurn&&hSum(me.h)>T&&(
+          {myTurn&&hSum(me.h)>T&&(
             <div style={{marginTop:10,padding:"6px 12px",borderRadius:8,background:"rgba(80,0,0,0.4)",border:"1px solid rgba(180,40,40,0.3)",fontSize:11,color:"#ff8080",lineHeight:1.5}}>
               ⚠ Over {T}! Use a trump card to recover, or Stand to lock in your bust.
             </div>
-          )} */}
+          )}
           <div style={{display:"flex",gap:10,marginTop:12}}>
             {isRevealing?(
               <div style={{padding:"10px 16px",borderRadius:10,background:"rgba(0,0,0,0.2)",border:"1px solid rgba(212,192,120,0.1)",fontSize:12,color:"#6a5820",fontStyle:"italic",letterSpacing:1}}>Revealing all hidden cards...</div>
