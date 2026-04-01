@@ -55,7 +55,7 @@ const mkRound = (sc,rnd,mode,settings,prevTr) => {
       {h:[{v:d[0],fd:true},{v:d[1],fd:false}], tr:[...(prevTr?.[0]||[]),...rT(2)], tbl:[], played:[], std:false, blk:false},
       {h:[{v:d[2],fd:true},{v:d[3],fd:false}], tr:[...(prevTr?.[1]||[]),...rT(2)], tbl:[], played:[], std:false, blk:false},
     ],
-    sc, rnd, cur:0,
+    sc, rnd, cur:0, ver:1,
     log:[`Round ${rnd} — Target: 21`],
     phase: mode==="bot" ? "play" : "play",
     mode, settings, p2joined:false,
@@ -464,7 +464,7 @@ const CreateRoomScreen = ({settings,onBack,roomCodeRef,setRoomCode,setMyPid,setG
     roomCodeRef.current=code;
     setRoomCode(code);
     setMyPid(0);
-    lastPushed.current=JSON.stringify(joinedState);
+    lastPushed.current=joinedState.ver||1;
     setGs(joinedState);
   },[joinedState]);// eslint-disable-line
 
@@ -550,8 +550,7 @@ export default function App() {
   const botRef=useRef(null);
   const revTimers=useRef([]);
   const roomCodeRef=useRef(null);
-  const lastPushed=useRef(null);
-  const needsPush=useRef(false);
+  const lastPushed=useRef(0);
 
   /* ── AUTO-NAVIGATE: when host's gs is set with p2joined, go to game ── */
   useEffect(()=>{
@@ -608,35 +607,71 @@ export default function App() {
     return()=>revTimers.current.forEach(clearTimeout);
   },[gs?.phase]);// eslint-disable-line
 
-  /* ── SYNC DURING GAME ── */
+  /* ── SYNC DURING GAME (Polling-based, reliable) ── */
   useEffect(()=>{
     if(!roomCode||screen!=="game") return;
-    const channel=supabase.channel(`game-${roomCode}`)
-      .on("postgres_changes",
-        {event:"UPDATE",schema:"public",table:"rooms",filter:`code=eq.${roomCode}`},
-        (payload)=>{
-          if(!payload.new?.state) return;
-          const inc=JSON.stringify(payload.new.state);
-          if(inc===lastPushed.current) return;
-          lastPushed.current=inc;
-          setGs(payload.new.state);
+    let stopped=false;
+    console.log("[SYNC] Starting poll for room:", roomCode, "myPid:", myPid);
+
+    const poll=setInterval(async()=>{
+      if(stopped) return;
+      try{
+        const {data,error}=await supabase.from("rooms").select("state").eq("code",roomCode).single();
+        if(error){console.warn("[SYNC] Poll error:",error);return;}
+        if(!data?.state) return;
+        const remote=data.state;
+        // Only update if remote version is newer than what we last pushed
+        if(remote.ver > (lastPushed.current||0)){
+          console.log("[SYNC] Got update: ver", remote.ver, "cur:", remote.cur, "phase:", remote.phase);
+          lastPushed.current=remote.ver;
+          setGs(remote);
         }
-      ).subscribe();
-    return()=>supabase.removeChannel(channel);
+      }catch(e){console.warn("[SYNC] Poll exception:",e);}
+    },1200);
+
+    // Also try Realtime for faster updates
+    let channel;
+    try{
+      channel=supabase.channel(`game-${roomCode}`)
+        .on("postgres_changes",
+          {event:"UPDATE",schema:"public",table:"rooms",filter:`code=eq.${roomCode}`},
+          (payload)=>{
+            if(stopped||!payload.new?.state) return;
+            const remote=payload.new.state;
+            if(remote.ver > (lastPushed.current||0)){
+              console.log("[SYNC-RT] Got update: ver", remote.ver, "cur:", remote.cur);
+              lastPushed.current=remote.ver;
+              setGs(remote);
+            }
+          }
+        ).subscribe();
+    }catch(e){console.warn("[SYNC] Realtime failed, polling only",e);}
+
+    return()=>{
+      stopped=true;
+      clearInterval(poll);
+      if(channel) supabase.removeChannel(channel);
+    };
   },[roomCode,screen]);
 
   /* ── PUSH MOVES ── */
-  const pushState = useCallback((newGs)=>{
+  const pushState = useCallback(async(newGs)=>{
     if(!roomCodeRef.current) return;
-    const str=JSON.stringify(newGs);
-    lastPushed.current=str;
-    supabase.from("rooms").update({state:newGs}).eq("code",roomCodeRef.current);
+    // Increment version
+    newGs.ver=(newGs.ver||0)+1;
+    lastPushed.current=newGs.ver;
+    console.log("[PUSH] Pushing ver:", newGs.ver, "cur:", newGs.cur, "phase:", newGs.phase, "code:", roomCodeRef.current);
+    try{
+      const {data,error}=await supabase.from("rooms").update({state:newGs}).eq("code",roomCodeRef.current).select();
+      if(error) console.error("[PUSH] FAILED:",error);
+      else console.log("[PUSH] Success, rows updated:", data?.length);
+    }catch(e){console.error("[PUSH] Exception:",e);}
   },[]);
 
   // Helper: set game state AND push to DB (for player-initiated actions)
   const setGsAndPush = useCallback((newGs)=>{
     setGs(newGs);
-    pushState(newGs);
+    if(roomCodeRef.current) pushState(newGs);
   },[pushState]);
 
   /* ── HELPERS ── */
@@ -768,13 +803,14 @@ export default function App() {
       onJoin={async(code)=>{
         const {data,error}=await supabase.from("rooms").select("state").eq("code",code).single();
         if(!data||error){alert("Room not found! Check the code and try again.");return;}
-        const updatedState={...data.state, p2joined:true};
+        const updatedState={...data.state, p2joined:true, ver:(data.state.ver||0)+1};
         const {error:updateError}=await supabase.from("rooms").update({state:updatedState}).eq("code",code);
         if(updateError){alert("Failed to join. Try again.");return;}
+        console.log("[JOIN] Joined room:", code, "ver:", updatedState.ver);
         roomCodeRef.current=code;
         setRoomCode(code);
         setMyPid(1);
-        lastPushed.current=JSON.stringify(updatedState);
+        lastPushed.current=updatedState.ver;
         setGs(updatedState);
         setScreen("game");
         setTimerKey(k=>k+1);
