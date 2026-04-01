@@ -924,7 +924,7 @@ export default function App() {
         </div>
 
         {/* Opponent zone */}
-        <div style={{background:"rgba(0,0,0,0.2)",borderRadius:14,padding:"14px 16px",border:"1px solid rgba(212,192,120,0.06)",boxShadow:isRevealing?"0 0 18px rgba(212,192,64,0.08)":"none",transition:"box-shadow 0.4s"}}>
+        <div style={{background:"rgba(0,0,0,0.2)",borderRadius:14,padding:"1px 16px",paddingBottom:"13px",border:"1px solid rgba(212,192,120,0.06)",boxShadow:isRevealing?"0 0 18px rgba(212,192,64,0.08)":"none",transition:"box-shadow 0.4s",position: "relative",minHeight: "140px"}}>
           <PlayerRow player={op} pid={1-activePid} isMe={false} isBot={isBot} mode={gs.mode} T={T} flippedSet={flippedSet}/>
           {botThinking&&(
             <div style={{display:"flex",gap:5,alignItems:"center",marginTop:10}}>
